@@ -1945,6 +1945,42 @@ _WEB_JUNK_TITLE = tuple(_FILTERS["junk_title"])
 _WEB_FREE_SITES = tuple(_FILTERS["free_sites"])
 _WEB_PIRATE_DOMS = tuple(_FILTERS["pirate_doms"])
 
+def _web_engine_bing_videos(q):
+    """必应视频垂直搜索（/videos/search）：返回各平台真实视频页（抖音/B站/央视频等公开内容），
+    标题取自视频卡封面 alt。与网页搜索互补，显著提升「全网搜视频」召回。"""
+    kw = urllib.parse.quote(q)
+    u = "https://www.bing.com/videos/search?q=%s&setlang=zh-hans" % kw
+    hd = {"User-Agent": (_DL_UA_POOL[0] if isinstance(_DL_UA_POOL, list) and _DL_UA_POOL else "Mozilla/5.0"),
+          "Accept-Language": "zh-CN,zh;q=0.9", "Accept-Encoding": "identity"}
+    status, body = http_get(u, timeout=15, headers=hd)
+    if status != 200:
+        return []
+    html = body.decode("utf-8", "ignore")
+    items, seen = [], set()
+    for m in re.finditer(r'<a[^>]*href="(https?://[^"]+)"[^>]*>(.*?)</a>', html, re.S):
+        url, inner = m.group(1), m.group(2)
+        low = url.lower()
+        if "bing.com/" in low:
+            continue
+        if not any(k in low for k in ("video", "play", "bangumi", "/v/", "bvid=", "/av", "?modal")):
+            continue
+        tm = re.search(r'alt="([^"]{4,160})"', inner)
+        title = tm.group(1) if tm else ""
+        if not title:
+            tm2 = re.search(r'title="([^"]{4,160})"', inner)
+            title = tm2.group(1) if tm2 else ""
+        if not title:
+            continue
+        if url in seen:
+            continue
+        seen.add(url)
+        items.append({"title": title[:120], "url": url,
+                      "summary": "必应视频搜索 · 全网公开视频", "engine": "必应视频"})
+        if len(items) >= 18:
+            break
+    return items
+
+
 def _web_engine_bing(q):
     """Bing 网页搜索"""
     kw = urllib.parse.quote(q)
@@ -2058,7 +2094,7 @@ def _web_video_search(q, page=1):
     if not kw:
         return {"ok": False, "error": "请输入关键词"}
     raw = []
-    for eng in (_web_engine_bing, _web_engine_baidu, _web_engine_sogou, _web_engine_360):
+    for eng in (_web_engine_bing_videos, _web_engine_bing, _web_engine_baidu, _web_engine_sogou, _web_engine_360):
         try:
             raw += eng(kw)
         except Exception:
@@ -2097,7 +2133,7 @@ def _web_video_search(q, page=1):
         items.append({"title": it["title"][:120], "url": url, "domain": dom[:40],
                       "summary": it["summary"][:160],
                       "hint": True, "level": lv,
-                      "engine": "必应/百度/搜狗/360"})
+                      "engine": it.get("engine", "必应/百度/搜狗/360")})
         if len(items) >= 30:
             break
     items.sort(key=lambda x: (-x.get("level", 0), x["engine"]))
