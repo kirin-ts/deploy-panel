@@ -30,3 +30,4 @@ data/tmp_play/
 _app_module*.txt
 _reinject*.py
 
+_fix_*.py
