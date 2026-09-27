@@ -2461,8 +2461,10 @@ def _yt_playinfo(u):
             "height": (vpick.get("height") if vpick else 0) or 0}
 
 
-def _dl_ytdlp(u, ddir, prog=None):
-    """通用下载：yt-dlp 解析（B站/微博/快手/YouTube 及 1000+ 站点）。失败抛错给引导。"""
+def _dl_ytdlp(u, ddir, prog=None, out_path=None, prefer_single=False):
+    """通用下载：yt-dlp 解析（B站/微博/快手/YouTube 及 1000+ 站点）。失败抛错给引导。
+    out_path: 指定输出路径（边下边播时预生成文件名，下载开始即有文件可播）
+    prefer_single: 优先单文件 mp4（如 B站 360/480p mp4），下载过程文件持续增长可边下边播"""
     if not YTDLP_AVAILABLE:
         raise RuntimeError("yt-dlp 未安装。请在本机运行: python -m pip install yt-dlp，然后重启面板。")
     import yt_dlp
@@ -2473,12 +2475,28 @@ def _dl_ytdlp(u, ddir, prog=None):
             if prog and total:
                 prog(done, total)
     opts = {
-        "outtmpl": os.path.join(ddir, "%(title)s [%(id)s].%(ext)s"),
+        "outtmpl": out_path or os.path.join(ddir, "%(title)s [%(id)s].%(ext)s"),
         "noplaylist": True, "quiet": True, "no_warnings": True,
         "progress_hooks": [_hook], "nocheckcertificate": True,
         "socket_timeout": 30, "retries": 3, "concurrent_fragment_downloads": 8,
         "ffmpeg_location": os.path.join(BASE, "bin", "ffmpeg", "bin"),
     }
+    if prefer_single:
+        # 优先单文件 mp4（边下边播）；无则保持默认（分离流下完合并后也可播）
+        try:
+            with yt_dlp.YoutubeDL({**opts, "quiet": True, "no_warnings": True}) as ydl0:
+                info0 = ydl0.extract_info(u, download=False)
+            fmts = info0.get("formats") or []
+            single_id = None
+            for f in fmts:
+                if (f.get("ext") == "mp4" and f.get("vcodec") and f.get("vcodec") != "none"
+                        and f.get("acodec") and f.get("acodec") != "none"):
+                    single_id = f.get("format_id") or ""
+                    break
+            if single_id:
+                opts["format"] = single_id
+        except Exception:
+            pass
     with yt_dlp.YoutubeDL(opts) as ydl:
         info = ydl.extract_info(u, download=True)
         fp = ""
@@ -2649,13 +2667,51 @@ _PLAY_TID = [0]
 
 
 def _play_worker(task):
-    """临时文件播放：yt-dlp 完整拉取到临时目录（不写下载日志/列表）。"""
+    """临时文件播放：yt-dlp 提取直链 → ffmpeg 边拉边转封装为 fMP4（moov 前置/分片），
+    输出文件从第一秒起就是可播容器，播放器任意时刻可边下边播；
+    ffmpeg 带 -reconnect 自动重连规避 CDN 长连接限流。不写下载日志/列表。"""
     u = task["url"]
+    out = os.path.join(task["dir"], "pl_%s.mp4" % task["id"])
+    task.update(path=out)
+    ff = os.path.join(BASE, "bin", "ffmpeg", "bin", "ffmpeg.exe")
+    logf = os.path.join(task["dir"], "pl_%s.log" % task["id"])
     try:
-        fp, size, ct, kind = _dl_ytdlp(u, task["dir"], prog=lambda d, t: task.update(pct=int(d * 100 / t) if t else 0))
-        task.update(done=True, path=fp, size=size, pct=100)
+        info = _yt_playinfo(u)
+        vurl = info.get("url") or ""
+        aurl = info.get("aurl") or ""
+        if not vurl:
+            raise RuntimeError("未能解析出直链（可能需登录或会员）")
+        ua = _DL_UA_POOL[0] if isinstance(_DL_UA_POOL, list) and _DL_UA_POOL else "Mozilla/5.0"
+        ref = "https://www.bilibili.com/"
+        hdrs = "User-Agent: %s\r\nReferer: %s\r\nAccept: */*\r\n" % (ua, ref)
+        args = [ff, "-hide_banner", "-y",
+                "-reconnect", "1", "-reconnect_streamed", "1", "-reconnect_delay_max", "30",
+                "-headers", hdrs, "-i", vurl]
+        if aurl:
+            args += ["-headers", hdrs, "-i", aurl, "-map", "0:v", "-map", "1:a"]
+        else:
+            args += ["-map", "0:v", "-map", "0:a?"]
+        args += ["-c", "copy", "-movflags", "frag_keyframe+empty_moov", "-f", "mp4", out]
+        with open(logf, "wb") as lg:
+            proc = subprocess.Popen(args, stdout=lg, stderr=lg)
+        while proc.poll() is None:
+            try:
+                sz = os.path.getsize(out)
+            except Exception:
+                sz = 0
+            task.update(bytes_done=sz)
+            time.sleep(0.4)
+        if proc.returncode != 0:
+            raise RuntimeError("转封装失败（rc=%s），该内容可能需登录或会员" % proc.returncode)
+        task.update(done=True, size=os.path.getsize(out), pct=100, bytes_done=os.path.getsize(out))
     except Exception as e:
         task.update(done=True, error=str(e)[:200])
+    finally:
+        try:
+            if os.path.exists(logf):
+                os.remove(logf)
+        except Exception:
+            pass
 
 
 def api_url_play_prep(params):
@@ -2670,7 +2726,8 @@ def api_url_play_prep(params):
                 "path": "", "size": 0, "error": ""}
         _PLAY_TASKS[tid] = task
     threading.Thread(target=_play_worker, args=(task,), daemon=True).start()
-    return {"ok": True, "task_id": tid}
+    return {"ok": True, "task_id": tid, "path": os.path.join(_PLAY_DIR, "pl_%s.mp4" % tid),
+            "streaming": True}
 
 
 def api_url_play_progress(params):
@@ -2681,7 +2738,8 @@ def api_url_play_progress(params):
             return {"ok": False, "error": "任务不存在或已过期"}
         r = dict(t)
     return {"ok": True, "task_id": tid, "done": r.get("done"), "pct": r.get("pct"),
-            "path": r.get("path", ""), "size": r.get("size", 0), "error": r.get("error", "")}
+            "path": r.get("path", ""), "size": r.get("size", 0),
+            "bytes_done": r.get("bytes_done", 0), "error": r.get("error", "")}
 
 
 def api_url_play_clean(params):
@@ -3113,6 +3171,26 @@ class Handler(BaseHTTPRequestHandler):
                     return self._send(404, b"not found", "text/plain; charset=utf-8")
                 ext = os.path.splitext(real)[1].lower()
                 ctype = _PREVIEW_MIME.get(ext, "application/octet-stream")
+                size = os.path.getsize(real)
+                # 边下边播：请求的 range 超出当前已下载字节，且播放任务未完成 → 等待下载到该位置
+                if real.startswith(play_root):
+                    rng0 = self.headers.get("Range", "")
+                    if rng0.startswith("bytes="):
+                        mm = re.match(r"bytes=(\d*)-(\d*)", rng0)
+                        if mm:
+                            r_end = int(mm.group(2) or (size - 1))
+                            if r_end >= size:
+                                deadline = time.time() + 15
+                                while time.time() < deadline and os.path.getsize(real) <= r_end:
+                                    tdone = False
+                                    with _PLAY_LOCK:
+                                        for _t in _PLAY_TASKS.values():
+                                            if _t.get("path") == real and _t.get("done"):
+                                                tdone = True
+                                                break
+                                    if tdone:
+                                        break
+                                    time.sleep(0.12)
                 size = os.path.getsize(real)
                 rng = self.headers.get("Range", "")
                 if rng.startswith("bytes="):
