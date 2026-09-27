@@ -55,7 +55,7 @@ def http_get(url, timeout=15, headers=None):
         return resp.status, resp.read()
 
 def config():
-    return load_json(os.path.join(DATA, "config.json"), {"token": ""})
+    return load_json(os.path.join(DATA, "config.json"), {})
 
 # ---------- 离线知识库 ----------
 LICENSES = load_json(os.path.join(KB, "licenses.json"), {}).get("licenses", [])
@@ -76,10 +76,7 @@ CACHE_FILE = os.path.join(DATA, "search_cache.json")
 
 def github_search(query, page=1):
     cache = load_json(CACHE_FILE, {"items": [], "ts": 0})
-    token = config().get("token", "")
     headers = {"Accept": "application/vnd.github+json"}
-    if token:
-        headers["Authorization"] = "Bearer " + token
     try:
         url = "https://api.github.com/search/repositories?q=" + urllib.parse.quote(query) + "&per_page=20&page=" + str(page)
         status, body = http_get(url, timeout=20, headers=headers)
@@ -112,10 +109,7 @@ LICENSE_CACHE_DIR = os.path.join(DATA, "license_cache")
 os.makedirs(LICENSE_CACHE_DIR, exist_ok=True)
 
 def fetch_raw(owner, repo, path, branch="master"):
-    token = config().get("token", "")
     headers = {}
-    if token:
-        headers["Authorization"] = "Bearer " + token
     for br in [branch, "main", "master"]:
         for p in [path, path + ".md", path + ".txt"]:
             url = f"https://raw.githubusercontent.com/{owner}/{repo}/{br}/{p}"
@@ -129,10 +123,7 @@ def fetch_raw(owner, repo, path, branch="master"):
 
 def fetch_repo_meta(full_name):
     owner, repo = full_name.split("/", 1)
-    token = config().get("token", "")
     headers = {"Accept": "application/vnd.github+json"}
-    if token:
-        headers["Authorization"] = "Bearer " + token
     try:
         status, body = http_get(f"https://api.github.com/repos/{owner}/{repo}", timeout=15, headers=headers)
         if status == 200:
@@ -325,10 +316,7 @@ def download_repo(full_name):
     os.makedirs(dest, exist_ok=True)
     zip_url = f"https://codeload.github.com/{owner}/{repo}/zip/refs/heads/main"
     tmp = os.path.join(WORKSPACES, safe + ".zip")
-    token = config().get("token", "")
     headers = {"User-Agent": UA["User-Agent"]}
-    if token:
-        headers["Authorization"] = "Bearer " + token
     ok = False
     for br in ["main", "master"]:
         url = f"https://codeload.github.com/{owner}/{repo}/zip/refs/heads/{br}"
@@ -518,10 +506,7 @@ def api_suggest(params):
     local = [it for it in cache.get("items", []) if q in it["full_name"].lower() or q in (it.get("description") or "").lower()]
     # 通道 2：GitHub 实时联想
     online = []
-    token = config().get("token", "")
     headers = {"Accept": "application/vnd.github+json"}
-    if token:
-        headers["Authorization"] = "Bearer " + token
     try:
         url = "https://api.github.com/search/repositories?q=" + urllib.parse.quote(q) + "&per_page=8&sort=stars"
         status, body = http_get(url, timeout=6, headers=headers)
@@ -2674,11 +2659,7 @@ def api_export(params):
     return {"ok": True, "zip_path": zip_path, "zip_name": os.path.basename(zip_path)}
 
 def api_settings(params):
-    cfg = config()
-    if params.get("token") is not None:
-        cfg["token"] = params.get("token", "").strip()
-        save_json(os.path.join(DATA, "config.json"), cfg)
-    return {"ok": True, "has_token": bool(cfg.get("token")), "hint": "GitHub Token 仅存于本机 data/config.json，用于提高 API 限额（可选）"}
+    return {"ok": True, "hint": "面板不保存任何凭据；GitHub 以匿名公共限额访问"}
 
 def api_status(params):
     return {"ok": True, "app": "DeployPanel", "version": "1.0", "offline_ready": True,

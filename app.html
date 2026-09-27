@@ -548,13 +548,6 @@ input:focus,textarea:focus{outline:none;border-color:var(--accent)}
     <section id="view-settings" class="hidden">
       <div class="card">
         <h3>设置</h3>
-        <div class="kv" style="margin-bottom:14px">
-          <span class="k">GitHub Token</span>
-          <span>(可选) 提高 API 限额：GitHub → Settings → Developer settings → Personal access tokens</span>
-        </div>
-        <input type="password" id="token-input" placeholder="ghp_... 或 github_pat_...（仅存本机）" style="margin-bottom:10px">
-        <button class="btn btn-primary" id="token-save">保存 Token</button>
-        <div id="token-status" style="margin-top:10px;font-size:12px;color:var(--text2)"></div>
       </div>
       <div class="card">
         <h3>关于</h3>
@@ -1194,12 +1187,6 @@ async function packFromInput(){
 }
 
 /* 设置 */
-$("#token-save").addEventListener("click",async()=>{
-  const token=$("#token-input").value.trim();
-  const r=await api("settings",{token:token});
-  $("#token-status").textContent=r.ok?(r.has_token?"✅ Token 已保存（仅存本机 data/config.json）":"Token 已清空"):"保存失败";
-});
-$("#token-input").addEventListener("keydown",e=>{if(e.key==="Enter")$("#token-save").click();});
 
 /* 初始化 */
 api("status").then(r=>{
