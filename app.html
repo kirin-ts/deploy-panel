@@ -521,15 +521,26 @@ input:focus,textarea:focus{outline:none;border-color:var(--accent)}
             <button class="btn btn-ghost btn-sm" onclick="mSug('光年之外')">光年之外</button>
             <button class="btn btn-ghost btn-sm" onclick="mSug('贝加尔湖畔')">贝加尔湖畔</button>
           </div>
+          <div id="m-pl" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;align-items:center">
+            <span style="color:var(--text2);font-size:12px;line-height:24px">🎵 歌单：</span>
+            <button class="btn btn-ghost btn-sm" onclick="mSug('经典老歌')">经典老歌</button>
+            <button class="btn btn-ghost btn-sm" onclick="mSug('华语流行')">华语流行</button>
+            <button class="btn btn-ghost btn-sm" onclick="mSug('民谣')">民谣</button>
+            <button class="btn btn-ghost btn-sm" onclick="mSug('轻音乐')">轻音乐</button>
+            <button class="btn btn-ghost btn-sm" onclick="mSug('影视原声')">影视原声</button>
+            <button class="btn btn-ghost btn-sm" onclick="mSug('游戏原声')">游戏原声</button>
+            <button class="btn btn-ghost btn-sm" onclick="mSug('儿歌')">儿歌</button>
+            <button class="btn btn-ghost btn-sm" onclick="mSug('钢琴曲')">钢琴曲</button>
+          </div>
           <div id="m-results" style="margin-top:8px;display:flex;flex-direction:column;gap:6px"></div>
           <audio id="m-audio" controls style="width:100%;margin-top:10px" preload="none"></audio>
         </div>
         </div>
         <div id="mt-panel-book" class="hidden">
         <div class="ua-card">
-          <b>📚 漫画 / 小说阅读（粘贴公开网页链接，本机提取内容）</b>
+          <b>📚 小说 / 漫画阅读（公开内容 · 本机提取）</b>
           <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
-            <input id="m-bq" class="input" placeholder="🔍 搜公开小说/漫画名（如：三体、灌篮高手）" style="flex:1;min-width:260px">
+            <input id="m-bq" class="input" placeholder="🔍 搜公开小说名（如：三体）" style="flex:1;min-width:260px">
             <button class="btn btn-primary btn-sm" onclick="mBSearch()">搜公开内容</button>
           </div>
           <div id="mb-sug" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;align-items:center">
@@ -547,8 +558,15 @@ input:focus,textarea:focus{outline:none;border-color:var(--accent)}
             <input id="m-book-url" class="input" placeholder="或直接粘贴小说/文章页 URL（提取正文阅读）" style="flex:1;min-width:260px">
             <button class="btn btn-primary btn-sm" onclick="mBookLoad()">读正文</button>
           </div>
+          <div id="m-comic-sites" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;align-items:center">
+            <span style="color:var(--text2);font-size:12px;line-height:24px">🖼 漫画站（仅公开免费章节，点开浏览）：</span>
+            <button class="btn btn-ghost btn-sm" onclick="mOpenSite('https://manhua.dmzj.com/')">动漫之家</button>
+            <button class="btn btn-ghost btn-sm" onclick="mOpenSite('https://www.kuaikanmanhua.com/')">快看漫画</button>
+            <button class="btn btn-ghost btn-sm" onclick="mOpenSite('https://manga.bilibili.com/')">哔哩漫画</button>
+            <button class="btn btn-ghost btn-sm" onclick="mOpenSite('https://ac.qq.com/Comic/all')">腾讯动漫</button>
+          </div>
           <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap;align-items:center">
-            <input id="m-comic-url" class="input" placeholder="漫画/图集页 URL（提取图片翻页）" style="flex:1;min-width:260px">
+            <input id="m-comic-url" class="input" placeholder="或粘贴漫画/图集页 URL（提取图片翻页）" style="flex:1;min-width:260px">
             <button class="btn btn-primary btn-sm" onclick="mComicLoad()">看图</button>
             <span id="m-comic-nav" style="font-size:12px;color:var(--text2)"></span>
           </div>
@@ -2865,6 +2883,7 @@ function mFont(d){const el=$("#m-read-body");let s=parseInt(el.style.fontSize||1
 /* ===== 媒体中心 · 小说/漫画 ===== */
 let mComicImgs=[], mComicIdx=0, mFontSz=15;
 function mBSug(t){$("#m-bq").value=t;mBSearch();}
+function mOpenSite(u){window.open(u,"_blank");}
 async function mBSearch(){
   const q=$("#m-bq").value.trim();
   if(!q){toast("请输入书名/关键词");return;}

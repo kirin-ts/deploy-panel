@@ -2264,9 +2264,27 @@ def _bili_search(stype, q, page=1):
 
 
 
+_WEB_DOM_CN = {
+    "douyin.com": "抖音", "v.douyin.com": "抖音", "tv.cctv.com": "央视频", "cctv.com": "央视频",
+    "yangshipin.cn": "央视频", "1905.com": "1905电影网", "ixigua.com": "西瓜视频",
+    "kuaishou.com": "快手", "pearvideo.com": "梨视频", "open.163.com": "网易公开课",
+    "icourse163.org": "中国大学MOOC", "bilibili.com": "B站", "b23.tv": "B站",
+    "youku.com": "优酷", "iqiyi.com": "爱奇艺", "qq.com": "腾讯视频", "mgtv.com": "芒果TV",
+    "sohu.com": "搜狐视频", "acfun.cn": "AcFun", "video.qq.com": "腾讯视频", "zhibo.qq.com": "腾讯直播",
+    "huya.com": "虎牙", "douyu.com": "斗鱼", "youtube.com": "YouTube", "youtu.be": "YouTube",
+    "vimeo.com": "Vimeo", "dailymotion.com": "Dailymotion", "archive.org": "Internet Archive",
+}
+def _web_dom_cn(url):
+    dom = (urllib.parse.urlparse(url).netloc or "").replace("www.", "").lower()
+    for k, v in _WEB_DOM_CN.items():
+        if k in dom:
+            return v
+    return dom or "网页"
+
 def api_video_search(params):
-    """公开视频聚合搜索：B站多类别（视频/直播/番剧/专栏）聚合 + 内容分类。
-    仅返回公开内容；付费/会员内容不索引。"""
+    """公开视频聚合搜索：B站定向（视频/直播/番剧/专栏） + 全网多平台（必应视频垂直，
+    抖音/央视频/1905/网易公开课等）并发融合去重 + 内容分类。
+    仅返回公开内容；付费/会员内容不索引。单源失败不阻塞整体；返回各源状态。"""
     q = str(params.get("q") or "").strip()
     if not q:
         return {"ok": False, "error": "请输入关键词"}
@@ -2274,31 +2292,84 @@ def api_video_search(params):
     src = str(params.get("source") or "all")
     want = {"all": ["video", "live", "media_bangumi"],
             "video": ["video"], "live": ["live"], "bangumi": ["media_bangumi"], "article": ["article"]}.get(src, ["video"])
+    import concurrent.futures as _cf
+    status = {}   # 各源状态
     items = []
-    srcs = []
-    for st in want:
+    def _run_bili(st):
         try:
             its, ok = _bili_search(st, q, page)
+            return ("bili_" + st, its if ok else [], ok)
         except Exception:
-            its, ok = [], False
-        if its:
-            items.extend(its)
-            nm = {"video": "B站视频", "live": "B站直播", "media_bangumi": "B站番剧", "article": "B站专栏"}.get(st, st)
-            srcs.append(nm + "公开搜索")
-    # 每条内容打内容分类
+            return ("bili_" + st, [], False)
+    def _run_web():
+        try:
+            its = _web_engine_bing_videos(q)
+            return ("web", its, True)
+        except Exception:
+            return ("web", [], False)
+    jobs = [lambda st=st: _run_bili(st) for st in want] + [_run_web]
+    with _cf.ThreadPoolExecutor(max_workers=min(5, len(jobs))) as ex:
+        futs = [ex.submit(f) for f in jobs]
+        for f in _cf.as_completed(futs):
+            try:
+                name, its, ok = f.result(timeout=20)
+            except Exception:
+                continue
+            status[name] = ok
+            if its:
+                if name.startswith("bili_"):
+                    items.extend(its)
+                else:
+                    for it in its:
+                        items.append({"platform": _web_dom_cn(it.get("url") or ""),
+                                      "kind": "video", "title": it.get("title") or "",
+                                      "url": it.get("url") or "", "bv": "",
+                                      "duration": "", "author": "",
+                                      "engine": it.get("engine") or "全网搜索"})
+    # 融合去重：标题前 40 字 + 域名/平台；同内容只留一条（B站结构化优先）
+    seen, dedup = set(), []
+    for it in items:
+        title_k = re.sub(r"[\s·【】\[\]（）()]+", "", (it.get("title") or "")[:40]).lower()
+        dom_k = (it.get("platform") or it.get("domain") or "").lower()
+        key = (title_k, dom_k)
+        if not title_k or key in seen:
+            continue
+        seen.add(key)
+        dedup.append(it)
+    # 单平台配额平衡（每平台最多 8 条，让位给更多来源）
+    dom_cnt, capped = {}, []
+    for it in dedup:
+        dom = it.get("platform") or ""
+        if dom_cnt.get(dom, 0) >= 8:
+            continue
+        dom_cnt[dom] = dom_cnt.get(dom, 0) + 1
+        capped.append(it)
+    # 结构化优先：有 duration/author 的 B站类排前，其余按平台
+    capped.sort(key=lambda x: (1 if (x.get("duration") or x.get("author")) else 2, x.get("platform") or ""))
+    items = capped[:36]
+    # 内容分类
     for it in items:
         it["tag"] = _cls_tag(it.get("title") or "")
-    tags = []
-    seen = {}
+    seen_t = {}
     for it in items:
         t = it["tag"]
-        seen[t] = seen.get(t, 0) + 1
-    tags = [{"name": k, "count": v} for k, v in seen.items()]
+        seen_t[t] = seen_t.get(t, 0) + 1
+    tags = [{"name": k, "count": v} for k, v in seen_t.items()]
     tags.sort(key=lambda x: -x["count"])
+    srcs = []
+    bili_ok = status.get("bili_video") or status.get("bili_media_bangumi") or status.get("bili_live")
+    if bili_ok:
+        srcs.append("B站公开搜索")
+    if status.get("web"):
+        srcs.append("全网多平台（抖音/央视频/1905 等）")
     if not items:
         return {"ok": False, "error": "公开搜索暂不可用（B站接口或网络异常）；可去平台站内搜索后把链接粘贴到下方直接播放/下载"}
-    return {"ok": True, "items": items, "tags": tags, "sources": srcs,
-            "note": "仅索引公开/免费内容；付费会员内容不在结果中；多平台（YouTube/西瓜/爱奇艺）因接口需登录/签名或防盗链，暂不可稳定直连播放"}
+    note = "仅索引公开/免费内容；付费会员内容不在结果中。"
+    if not status.get("web"):
+        note += " 全网多平台通道本次未返回（网络波动），已尽力用B站结果补齐。"
+    if not bili_ok:
+        note += " B站通道本次失败，已用全网多平台结果补齐。"
+    return {"ok": True, "items": items, "tags": tags, "sources": srcs, "note": note}
 
 
 def api_url_playinfo(params):
@@ -3408,8 +3479,7 @@ def api_url_dl_open(params):
         if os.path.isdir(real):
             os.startfile(real)
         elif os.path.isfile(real):
-            os.startfile(os.path.dirname(real))
-            os.startfile(real)
+            subprocess.Popen(["explorer", "/select,", real])
         else:
             return {"ok": False, "error": "路径不存在"}
         return {"ok": True}
