@@ -1899,9 +1899,6 @@ _WEB_PAID_DOMS = ("v.qq.com", "iqiyi.com", "youku.com", "mgtv.com", "tv.sohu.com
                   "letv.com", "pptv.com", "kankan.com", "fun.tv", "miguvideo.com",
                   "ke.qq.com", "xue.taobao.com", "qiyi", "yidianzixun.com/video",
                   "mgtvtv.com", "le.com", "letv", "vip.qq.com", "vip.iqiyi.com")
-# 标题中出现的关键词 → 判定为视频内容
-_WEB_VIDEO_KW = ("视频", "在线观看", "全集", "高清", "完整版", "正片", "综艺", "剧集", "电影",
-                 "第1集", "第2集", "mv", "live", "纪录片", "公开课", "教程", "直播", "演唱会", "短视频", "正片完整版")
 # 非正片内容过滤：解说/速看/盘点/混剪/书评/小说等（避免混入解说与小说内容）
 _WEB_JUNK_TITLE = ("解说", "速看", "一口气", "盘点", "混剪", "影评", "书评", "读后感",
                    "深度解析", "剧情解读", "剧情讲解", "解读", "小说", "在线阅读", "最新章节",
@@ -2046,9 +2043,9 @@ def _web_video_search(q, page=1):
             continue  # 付费/会员平台直接过滤，仅保留免费公开内容
         if any(k in it["title"] for k in _WEB_JUNK_TITLE):
             continue  # 解说/速看/小说/书评等非正片内容过滤
-        lv = 2 if any(d in low for d in _WEB_VIDEO_DOMS) else (1 if any(k in title_low for k in _WEB_VIDEO_KW) else 0)
-        if lv == 0:
-            continue  # 非视频资源（书籍/百科/官网/词典等）过滤
+        if not any(d in low for d in _WEB_VIDEO_DOMS):
+            continue  # 非免费视频平台域名过滤（不再按标题词判定，杜绝小说/解说/官网混入）
+        lv = 2
         items.append({"title": it["title"][:120], "url": url, "domain": dom[:40],
                       "summary": it["summary"][:160],
                       "hint": True, "level": lv,
