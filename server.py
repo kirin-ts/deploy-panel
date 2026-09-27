@@ -1883,21 +1883,30 @@ _WEB_BLACK_DOM = ("baike.baidu", "baike.so.com", "zdic.net", "hanyuguoxue", "chi
                     "taobao.com", "tmall.com", "dangdang.com", "39.net", "docin.com",
                     "wenku.baidu", "cqvip", "wanfangdata", "dict.", "cnki",
                     "jjwxc", "qidian", "zhulang", "huayue", "biquge",
-                    "weread", "fanqienovel", "fanqie", "qingting", "ximalaya")
+                    "weread", "fanqienovel", "fanqie", "qingting", "ximalaya",
+                    "read.qq.com", "books.read", "yunqi", "chuangshi", "qingyunian",
+                    "zhangyue", "17k.com", "hengyan", "shuqi", "readnovel", "wuxiaworld",
+                    "linovel", "ciweimao", "sfacg")
 _WEB_BLACK_TITLE = ("站长", "APP下载", "网盘资源", "文库", "下载文档")
 # 免费/公开视频平台白名单：命中即判定为免费视频平台页（B站/公开课/央视/UGC等）
 _WEB_VIDEO_DOMS = ("bilibili.com", "douyin.com", "ixigua.com", "weibo.com", "kuaishou.com",
                    "acfun.cn", "163.com", "icourse163.org", "mooc", "study.163.com",
                    "open.163.com", "youtube.com", "vimeo.com", "pearvideo.com",
                    "haokan.baidu.com", "v.baidu.com", "toutiao.com", "cctv.com", "cntv.cn",
-                   "cnmooc", "cloud.tencent.com/edu")
+                   "cnmooc", "cloud.tencent.com/edu", "1905.com")
 # 付费/会员视频平台黑名单：命中直接过滤（避免出现需会员的内容，规避违规风险）
 _WEB_PAID_DOMS = ("v.qq.com", "iqiyi.com", "youku.com", "mgtv.com", "tv.sohu.com",
                   "letv.com", "pptv.com", "kankan.com", "fun.tv", "miguvideo.com",
-                  "ke.qq.com", "xue.taobao.com", "qiyi", "yidianzixun.com/video")
+                  "ke.qq.com", "xue.taobao.com", "qiyi", "yidianzixun.com/video",
+                  "mgtvtv.com", "le.com", "letv", "vip.qq.com", "vip.iqiyi.com")
 # 标题中出现的关键词 → 判定为视频内容
-_WEB_VIDEO_KW = ("视频", "在线观看", "全集", "高清", "完整版", "正片", "预告", "综艺", "剧集", "电影",
-                 "第1集", "第2集", "mv", "live", "纪录片", "公开课", "教程", "直播", "演唱会", "短视频")
+_WEB_VIDEO_KW = ("视频", "在线观看", "全集", "高清", "完整版", "正片", "综艺", "剧集", "电影",
+                 "第1集", "第2集", "mv", "live", "纪录片", "公开课", "教程", "直播", "演唱会", "短视频", "正片完整版")
+# 非正片内容过滤：解说/速看/盘点/混剪/书评/小说等（避免混入解说与小说内容）
+_WEB_JUNK_TITLE = ("解说", "速看", "一口气", "盘点", "混剪", "影评", "书评", "读后感",
+                   "深度解析", "剧情解读", "剧情讲解", "解读", "小说", "在线阅读", "最新章节",
+                   "大结局", "剧情介绍", "第一集到", "reaction", "盘点top", "盘点TOP",
+                   "动画解说", "逐集解说", "漫剪", "安利", "科普")
 
 def _web_engine_bing(q):
     """Bing 网页搜索"""
@@ -2003,6 +2012,8 @@ def _web_video_search(q, page=1):
         title_low = it["title"].lower()
         if any(d in low for d in _WEB_PAID_DOMS):
             continue  # 付费/会员平台直接过滤，仅保留免费公开内容
+        if any(k in it["title"] for k in _WEB_JUNK_TITLE):
+            continue  # 解说/速看/小说/书评等非正片内容过滤
         lv = 2 if any(d in low for d in _WEB_VIDEO_DOMS) else (1 if any(k in title_low for k in _WEB_VIDEO_KW) else 0)
         if lv == 0:
             continue  # 非视频资源（书籍/百科/官网/词典等）过滤
