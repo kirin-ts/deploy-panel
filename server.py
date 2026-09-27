@@ -3041,6 +3041,7 @@ def _play_worker(task):
         hdrs = "User-Agent: %s\r\nReferer: %s\r\nAccept: */*\r\n" % (ua, ref)
         args = [ff, "-hide_banner", "-y",
                 "-reconnect", "1", "-reconnect_streamed", "1", "-reconnect_delay_max", "30",
+                "-rw_timeout", "15000000", "-timeout", "15000000",
                 "-headers", hdrs, "-i", vurl]
         if aurl:
             args += ["-headers", hdrs, "-i", aurl, "-map", "0:v", "-map", "1:a"]
@@ -3056,17 +3057,39 @@ def _play_worker(task):
         else:
             args += ["-c:v", "copy", "-c:a", "aac", "-b:a", "128k", "-ar", "44100",
                      "-movflags", "frag_keyframe+empty_moov", "-f", "mp4", out]
-        with open(logf, "wb") as lg:
-            proc = subprocess.Popen(args, stdout=lg, stderr=lg)
-        while proc.poll() is None:
+        src_dur = float(info.get("duration") or 0)
+        ffprobe = os.path.join(BASE, "bin", "ffmpeg", "bin", "ffprobe.exe")
+        def _probe_dur(fp):
             try:
-                sz = os.path.getsize(out)
+                r = subprocess.run([ffprobe, "-v", "error", "-show_entries", "format=duration",
+                                    "-of", "csv=p=0", fp], capture_output=True, text=True, timeout=30)
+                return float(r.stdout.strip() or 0)
             except Exception:
-                sz = 0
-            task.update(bytes_done=sz)
-            time.sleep(0.4)
-        if proc.returncode != 0:
-            raise RuntimeError("转封装失败（rc=%s），该内容可能需登录或会员" % proc.returncode)
+                return 0.0
+        # 转封装（最多 2 次）：拉流不完整（只拉到开头几秒且未报错）时自动重拉
+        for _attempt in range(2):
+            with open(logf, "wb") as lg:
+                proc = subprocess.Popen(args, stdout=lg, stderr=lg)
+            while proc.poll() is None:
+                try:
+                    sz = os.path.getsize(out)
+                except Exception:
+                    sz = 0
+                task.update(bytes_done=sz)
+                time.sleep(0.4)
+            if proc.returncode != 0:
+                raise RuntimeError("转封装失败（rc=%s），该内容可能需登录或会员" % proc.returncode)
+            out_dur = _probe_dur(out)
+            # 源时长为 0（未知）时不校验；差异阈值 8%
+            if src_dur > 0 and out_dur > 0 and abs(out_dur - src_dur) / src_dur > 0.08:
+                try:
+                    os.remove(out)
+                except Exception:
+                    pass
+                continue  # 拉流不完整，重拉一次
+            break
+        if src_dur > 0 and out_dur > 0 and abs(out_dur - src_dur) / src_dur > 0.08:
+            raise RuntimeError("源站拉流不完整（转出 %ds / 源 %ds），已重试仍失败，请稍后重试" % (int(out_dur), int(src_dur)))
         task.update(done=True, size=os.path.getsize(out), pct=100, bytes_done=os.path.getsize(out))
     except Exception as e:
         task.update(done=True, error=str(e)[:200])
