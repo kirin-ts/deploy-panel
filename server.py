@@ -1879,20 +1879,22 @@ def _cls_tag(title):
     return "其他"
 
 
-_WEB_BLACK_DOM = ("baike.baidu", "zdic.net", "hanyuguoxue", "chinesewords.org", "jd.com",
+_WEB_BLACK_DOM = ("baike.baidu", "baike.so.com", "zdic.net", "hanyuguoxue", "chinesewords.org", "jd.com",
                     "taobao.com", "tmall.com", "dangdang.com", "39.net", "docin.com",
                     "wenku.baidu", "cqvip", "wanfangdata", "dict.", "cnki",
                     "jjwxc", "qidian", "zhulang", "huayue", "biquge",
                     "weread", "fanqienovel", "fanqie", "qingting", "ximalaya")
 _WEB_BLACK_TITLE = ("站长", "APP下载", "网盘资源", "文库", "下载文档")
-# 视频平台域名白名单：命中即判定为视频平台页（解析播放成功率更高）
-_WEB_VIDEO_DOMS = ("bilibili.com", "douyin.com", "ixigua.com", "youku.com", "iqiyi.com",
-                   "mgtv.com", "tv.sohu.com", "v.qq.com", "weibo.com", "kuaishou.com",
+# 免费/公开视频平台白名单：命中即判定为免费视频平台页（B站/公开课/央视/UGC等）
+_WEB_VIDEO_DOMS = ("bilibili.com", "douyin.com", "ixigua.com", "weibo.com", "kuaishou.com",
                    "acfun.cn", "163.com", "icourse163.org", "mooc", "study.163.com",
                    "open.163.com", "youtube.com", "vimeo.com", "pearvideo.com",
-                   "haokan.baidu.com", "v.baidu.com", "toutiao.com", "kankan.com",
-                   "miguvideo.com", "cctv.com", "cntv.cn", "letv.com", "pptv.com",
-                   "fun.tv", "cnmooc", "xue.taobao.com", "ke.qq.com", "cloud.tencent.com/edu")
+                   "haokan.baidu.com", "v.baidu.com", "toutiao.com", "cctv.com", "cntv.cn",
+                   "cnmooc", "cloud.tencent.com/edu")
+# 付费/会员视频平台黑名单：命中直接过滤（避免出现需会员的内容，规避违规风险）
+_WEB_PAID_DOMS = ("v.qq.com", "iqiyi.com", "youku.com", "mgtv.com", "tv.sohu.com",
+                  "letv.com", "pptv.com", "kankan.com", "fun.tv", "miguvideo.com",
+                  "ke.qq.com", "xue.taobao.com", "qiyi", "yidianzixun.com/video")
 # 标题中出现的关键词 → 判定为视频内容
 _WEB_VIDEO_KW = ("视频", "在线观看", "全集", "高清", "完整版", "正片", "预告", "综艺", "剧集", "电影",
                  "第1集", "第2集", "mv", "live", "纪录片", "公开课", "教程", "直播", "演唱会", "短视频")
@@ -1999,6 +2001,8 @@ def _web_video_search(q, page=1):
         seen.add(key)
         dom = (urllib.parse.urlparse(url).netloc or "").replace("www.", "")
         title_low = it["title"].lower()
+        if any(d in low for d in _WEB_PAID_DOMS):
+            continue  # 付费/会员平台直接过滤，仅保留免费公开内容
         lv = 2 if any(d in low for d in _WEB_VIDEO_DOMS) else (1 if any(k in title_low for k in _WEB_VIDEO_KW) else 0)
         if lv == 0:
             continue  # 非视频资源（书籍/百科/官网/词典等）过滤
