@@ -2482,9 +2482,9 @@ async function uaPlayPrep(u,title){
   $("#ua-play-video").style.display="none";
   $("#ua-play-prog").style.display="flex";
   $("#ua-play-prog-bar").style.width="4%";
-  $("#ua-play-prog-txt").textContent="边下载边播放…";
+  $("#ua-play-prog-txt").textContent="正在加载视频…";
   $("#ua-play-mask").classList.remove("hidden");
-  toast("边下载边播放（播放结束自动清理，不保留文件）");
+  toast("正在加载，可随时拖动进度（播放结束自动清理）");
   const r=await apiPost("url/play_prep",{url:u});
   if(!r.ok){uaPlayClose();toast(r.error||"准备失败");return;}
   const tid=r.task_id;
@@ -2512,7 +2512,7 @@ async function uaPlayPrep(u,title){
     }
     const mb=(p.bytes_done||0)/1048576;
     $("#ua-play-prog-bar").style.width=Math.max(4,Math.min(100,(p.pct>0?p.pct:4)))+"%";
-    $("#ua-play-prog-txt").textContent="边下载边播放 "+(mb>0?mb.toFixed(1)+" MB":Math.max(1,Math.floor((Date.now()-t0)/1000))+" 秒");
+    $("#ua-play-prog-txt").textContent="正在加载视频"+(mb>0?" "+mb.toFixed(1)+" MB":"");
   },700);
 }
 function uaPlayClose(){
@@ -2768,7 +2768,7 @@ function mComicNext(){if(mComicIdx<mComicImgs.length-1){mComicIdx++;mComicShow()
     <div style="flex:1;height:8px;background:#ffffff1a;border-radius:4px;overflow:hidden"><div id="ua-play-prog-bar" style="height:100%;width:0%;background:#4fd08a;transition:width .3s"></div></div>
     <span id="ua-play-prog-txt" style="color:#fff;font-size:13px;min-width:60px">准备中…</span>
   </div>
-  <div style="color:#fff8;font-size:12px">公开视频直接播放 · 无广告/弹窗 · 播放结束自动清理，不保留文件 · VIP/会员内容不支持</div>
+  <div style="color:#fff8;font-size:12px">公开视频直接在线播放 · 无广告/弹窗 · 关闭即自动清理 · VIP/会员内容不支持</div>
 </div>
 </body>
 </html>
