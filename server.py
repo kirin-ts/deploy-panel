@@ -1879,31 +1879,67 @@ def _cls_tag(title):
     return "其他"
 
 
-_WEB_BLACK_DOM = ("baike.baidu", "baike.so.com", "zdic.net", "hanyuguoxue", "chinesewords.org", "jd.com",
-                    "taobao.com", "tmall.com", "dangdang.com", "39.net", "docin.com",
-                    "wenku.baidu", "cqvip", "wanfangdata", "dict.", "cnki",
-                    "jjwxc", "qidian", "zhulang", "huayue", "biquge",
-                    "weread", "fanqienovel", "fanqie", "qingting", "ximalaya",
-                    "read.qq.com", "books.read", "yunqi", "chuangshi", "qingyunian",
-                    "zhangyue", "17k.com", "hengyan", "shuqi", "readnovel", "wuxiaworld",
-                    "linovel", "ciweimao", "sfacg")
-_WEB_BLACK_TITLE = ("站长", "APP下载", "网盘资源", "文库", "下载文档")
-# 免费/公开视频平台白名单：命中即判定为免费视频平台页（B站/公开课/央视/UGC等）
-_WEB_VIDEO_DOMS = ("bilibili.com", "douyin.com", "ixigua.com", "weibo.com", "kuaishou.com",
+# ===== 内容过滤名单（全部可配置，用户可在界面/ filters.json 中自由增删，不剥夺用户控制权） =====
+_FILTER_DEFAULTS = {
+    "black_dom": ["baike.baidu", "baike.so.com", "zdic.net", "hanyuguoxue", "chinesewords.org", "jd.com",
+                  "taobao.com", "tmall.com", "dangdang.com", "39.net", "docin.com",
+                  "wenku.baidu", "cqvip", "wanfangdata", "dict.", "cnki",
+                  "jjwxc", "qidian", "zhulang", "huayue", "biquge",
+                  "weread", "fanqienovel", "fanqie", "qingting", "ximalaya",
+                  "read.qq.com", "books.read", "yunqi", "chuangshi", "qingyunian",
+                  "zhangyue", "17k.com", "hengyan", "shuqi", "readnovel", "wuxiaworld",
+                  "linovel", "ciweimao", "sfacg"],
+    "black_title": ["站长", "APP下载", "网盘资源", "文库", "下载文档"],
+    "video_doms": ["bilibili.com", "douyin.com", "ixigua.com", "weibo.com", "kuaishou.com",
                    "acfun.cn", "163.com", "icourse163.org", "mooc", "study.163.com",
                    "open.163.com", "youtube.com", "vimeo.com", "pearvideo.com",
                    "haokan.baidu.com", "v.baidu.com", "toutiao.com", "cctv.com", "cntv.cn",
-                   "cnmooc", "cloud.tencent.com/edu", "1905.com")
-# 付费/会员视频平台黑名单：命中直接过滤（避免出现需会员的内容，规避违规风险）
-_WEB_PAID_DOMS = ("v.qq.com", "iqiyi.com", "youku.com", "mgtv.com", "tv.sohu.com",
+                   "cnmooc", "cloud.tencent.com/edu", "1905.com"],
+    "paid_doms": ["v.qq.com", "iqiyi.com", "youku.com", "mgtv.com", "tv.sohu.com",
                   "letv.com", "pptv.com", "kankan.com", "fun.tv", "miguvideo.com",
                   "ke.qq.com", "xue.taobao.com", "qiyi", "yidianzixun.com/video",
-                  "mgtvtv.com", "le.com", "letv", "vip.qq.com", "vip.iqiyi.com")
-# 非正片内容过滤：解说/速看/盘点/混剪/书评/小说等（避免混入解说与小说内容）
-_WEB_JUNK_TITLE = ("解说", "速看", "一口气", "盘点", "混剪", "影评", "书评", "读后感",
+                  "mgtvtv.com", "le.com", "letv", "vip.qq.com", "vip.iqiyi.com"],
+    "junk_title": ["解说", "速看", "一口气", "盘点", "混剪", "影评", "书评", "读后感",
                    "深度解析", "剧情解读", "剧情讲解", "解读", "小说", "在线阅读", "最新章节",
                    "大结局", "剧情介绍", "第一集到", "reaction", "盘点top", "盘点TOP",
-                   "动画解说", "逐集解说", "漫剪", "安利", "科普")
+                   "动画解说", "逐集解说", "漫剪", "安利", "科普"],
+    "free_sites": ["tv.cctv.com", "jishi.cctv.com", "bilibili.com", "1905.com",
+                   "open.163.com", "icourse163.org", "ixigua.com", "v.douyin.com",
+                   "v.kuaishou.com", "pearvideo.com", "tv.cctv.com/videos"],
+}
+_FILTER_KEYS = ("black_dom", "black_title", "video_doms", "paid_doms", "junk_title", "free_sites")
+_FILTERS = dict(_FILTER_DEFAULTS)
+_FILTER_FILE = os.path.join(DATA, "filters.json")
+
+def _load_filters():
+    """从 data/filters.json 加载用户自定义名单；文件不存在则写入默认值"""
+    global _FILTERS
+    try:
+        if os.path.exists(_FILTER_FILE):
+            with open(_FILTER_FILE, "r", encoding="utf-8") as f:
+                d = json.load(f)
+            _FILTERS = dict(_FILTER_DEFAULTS)
+            for k in _FILTER_KEYS:
+                v = d.get(k)
+                if isinstance(v, list) and all(isinstance(x, str) for x in v):
+                    _FILTERS[k] = v
+        else:
+            _FILTERS = dict(_FILTER_DEFAULTS)
+            with open(_FILTER_FILE, "w", encoding="utf-8") as f:
+                json.dump(_FILTERS, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        log("filters load error: " + repr(e))
+        _FILTERS = dict(_FILTER_DEFAULTS)
+    return _FILTERS
+
+_load_filters()
+
+_WEB_BLACK_DOM = tuple(_FILTERS["black_dom"])
+_WEB_BLACK_TITLE = tuple(_FILTERS["black_title"])
+_WEB_VIDEO_DOMS = tuple(_FILTERS["video_doms"])
+_WEB_PAID_DOMS = tuple(_FILTERS["paid_doms"])
+_WEB_JUNK_TITLE = tuple(_FILTERS["junk_title"])
+_WEB_FREE_SITES = tuple(_FILTERS["free_sites"])
 
 def _web_engine_bing(q):
     """Bing 网页搜索"""
@@ -2078,6 +2114,35 @@ def api_media_nofilter(body):
             except Exception:
                 pass
     return {"ok": True, "on": not os.path.exists(f), "note": "on=内容过滤开启(仅免费公开视频) / off=调试模式(显示全部结果)"}
+
+def api_media_filters(body):
+    """内容过滤名单配置：空 body 查询全部；{list:'paid_doms',op:'add'|'remove'|'set',value:...} 修改"""
+    global _FILTERS, _WEB_BLACK_DOM, _WEB_BLACK_TITLE, _WEB_VIDEO_DOMS, _WEB_PAID_DOMS, _WEB_JUNK_TITLE, _WEB_FREE_SITES
+    lst = (body or {}).get("list")
+    op = (body or {}).get("op")
+    val = (body or {}).get("value")
+    if lst in _FILTER_KEYS and op in ("add", "remove", "set"):
+        cur = list(_FILTERS[lst])
+        if op == "add" and isinstance(val, str) and val.strip() and val.strip() not in cur:
+            cur.append(val.strip())
+        elif op == "remove" and isinstance(val, str):
+            cur = [x for x in cur if x != val.strip()]
+        elif op == "set" and isinstance(val, list):
+            cur = [str(x).strip() for x in val if str(x).strip()]
+        _FILTERS[lst] = cur
+        try:
+            with open(_FILTER_FILE, "w", encoding="utf-8") as f:
+                json.dump(_FILTERS, f, ensure_ascii=False, indent=2)
+        except Exception as e:
+            log("filters save error: " + repr(e))
+        # 同步生效
+        _WEB_BLACK_DOM = tuple(_FILTERS["black_dom"])
+        _WEB_BLACK_TITLE = tuple(_FILTERS["black_title"])
+        _WEB_VIDEO_DOMS = tuple(_FILTERS["video_doms"])
+        _WEB_PAID_DOMS = tuple(_FILTERS["paid_doms"])
+        _WEB_JUNK_TITLE = tuple(_FILTERS["junk_title"])
+        _WEB_FREE_SITES = tuple(_FILTERS["free_sites"])
+    return {"ok": True, "filters": {k: _FILTERS[k] for k in _FILTER_KEYS}}
 
 def _bili_search(stype, q, page=1):
     """B站 wbi 公开搜索，返回 (items, ok)"""
@@ -3649,6 +3714,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(200, json.dumps(api_media_article(body), ensure_ascii=False).encode("utf-8"))
             if parsed.path == "/api/media/manga":
                 return self._send(200, json.dumps(api_media_manga(body), ensure_ascii=False).encode("utf-8"))
+            if parsed.path == "/api/media/filters":
+                return self._send(200, json.dumps(api_media_filters(body), ensure_ascii=False).encode("utf-8"))
             if parsed.path == "/api/media/nofilter":
                 return self._send(200, json.dumps(api_media_nofilter(body), ensure_ascii=False).encode("utf-8"))
             if parsed.path == "/api/media/websearch":

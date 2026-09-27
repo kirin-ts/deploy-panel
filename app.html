@@ -476,6 +476,7 @@ input:focus,textarea:focus{outline:none;border-color:var(--accent)}
           <span style="flex:1"></span>
           <span style="font-size:11px;color:var(--text2)">仅公开/免费内容 · 付费会员内容不索引</span>
           <button id="ua-filter-btn" class="btn btn-ghost btn-sm" onclick="uaToggleFilter()" style="font-size:11px;margin-left:6px" title="内容过滤开关：开=只显示免费公开视频；关=调试模式显示全部搜索结果">过滤：…</button>
+          <button class="btn btn-ghost btn-sm" onclick="uaOpenFilterCfg()" style="font-size:11px;margin-left:4px" title="编辑过滤黑白名单，全部由你掌控">过滤配置</button>
         </div>
         <div id="mt-panel-video">
         <div class="ua-card">
@@ -771,6 +772,17 @@ input:focus,textarea:focus{outline:none;border-color:var(--accent)}
   </div>
 </div>
 <div class="toast" id="toast"></div>
+<div id="ua-fg-mask" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:999;align-items:center;justify-content:center">
+  <div style="background:var(--bg,#fff);border-radius:10px;max-width:760px;width:92%;max-height:84vh;overflow:auto;padding:16px;box-shadow:0 8px 30px rgba(0,0,0,.25)">
+    <div style="display:flex;align-items:center;margin-bottom:8px">
+      <b>内容过滤配置 · 黑白名单全部由你掌控</b>
+      <span style="flex:1"></span>
+      <button class="btn btn-sm" onclick="uaCloseFilterCfg()">关闭</button>
+    </div>
+    <div style="font-size:12px;color:var(--text2);margin-bottom:10px;line-height:1.6">过滤名单全部可编辑：点 × 删除条目，输入后回车或点「添加」新增条目。改动即时保存、下次搜索立即生效。付费平台黑名单若被移除，相关付费内容将出现在结果中，其播放需会员——相关风险由你自行评估。</div>
+    <div id="ua-fg-body" style="display:flex;flex-direction:column;gap:10px"></div>
+  </div>
+</div>
 
 <script>
 "use strict";
@@ -2572,6 +2584,53 @@ function mtTab(name,btn){
     b.style.background=on?"var(--accent11,#eaf1ff)":"";
   });
 }
+const _FG_META=[["black_dom","非视频站黑名单(域名)"],["black_title","黑名单标题词"],["video_doms","免费视频平台白名单(域名)"],["paid_doms","付费/会员平台黑名单(域名)"],["junk_title","非正片标题词(解说/小说等)"],["free_sites","站内搜索免费站点"]];
+let _fgData={};
+function uaOpenFilterCfg(){
+  const mask=document.getElementById("ua-fg-mask");
+  if(!mask){ toast("配置面板未加载"); return; }
+  apiPost("media/filters",{}).then(r=>{
+    if(r&&r.filters){ _fgData=r.filters; fgRender(); mask.style.display="flex"; }
+    else toast("读取配置失败");
+  }).catch(e=>toast("读取配置失败:"+(e&&e.message||e)));
+}
+function uaCloseFilterCfg(){ const m=document.getElementById("ua-fg-mask"); if(m) m.style.display="none"; }
+function fgRender(){
+  const body=document.getElementById("ua-fg-body"); if(!body) return;
+  body.innerHTML="";
+  for(const [key,label] of _FG_META){
+    const list=_fgData[key]||[];
+    const g=document.createElement("div");
+    g.style.cssText="border:1px solid var(--line,#e3e6ef);border-radius:8px;padding:10px";
+    g.innerHTML="<div style='font-size:13px;font-weight:600;margin-bottom:6px'>"+esc(label)+" <span style='color:var(--text2);font-weight:400;font-size:11px'>("+esc(key)+") · "+list.length+" 项</span></div>"+
+      "<div class='fg-chips' style='display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px'></div>"+
+      "<div style='display:flex;gap:6px'><input class='input' placeholder='输入关键词/域名，回车或点添加' style='flex:1;font-size:12px'><button class='btn btn-sm btn-primary' onclick='fgAdd(this.parentElement)'>添加</button></div>";
+    const chips=g.querySelector(".fg-chips");
+    list.forEach(it=>{
+      const c=document.createElement("span");
+      c.style.cssText="display:inline-flex;align-items:center;gap:4px;font-size:12px;background:var(--accent11,#eaf1ff);color:var(--accent,#2f6bff);border-radius:999px;padding:3px 9px;cursor:pointer;user-select:none";
+      c.title="点击删除";
+      c.innerHTML=esc(it)+" <span style='color:#d05c5c;font-weight:700'>×</span>";
+      c.onclick=()=>fgDel(key,it);
+      chips.appendChild(c);
+    });
+    body.appendChild(g);
+    g.querySelector("input").parentElement._fgKey = key;
+    g.querySelector("input").addEventListener("keydown", function(e){ if(e.key==="Enter") fgAdd(e.target.parentElement); });
+  }
+}
+function fgDel(key,val){
+  apiPost("media/filters",{list:key,op:"remove",value:val}).then(r=>{
+    if(r&&r.filters){ _fgData=r.filters; fgRender(); toast("已删除："+val); }
+  }).catch(e=>toast("操作失败:"+(e&&e.message||e)));
+}
+function fgAdd(parentEl){
+  const inp=parentEl.querySelector("input"); const v=(inp.value||"").trim();
+  if(!v){ toast("请输入内容"); return; }
+  apiPost("media/filters",{list:parentEl._fgKey||"",op:"add",value:v}).then(r=>{
+    if(r&&r.filters){ _fgData=r.filters; fgRender(); toast("已添加："+v); }
+  }).catch(e=>toast("操作失败:"+(e&&e.message||e)));
+}
 let _uaFilterOn = true;
 function uaFilterBtn(){
   const b = document.getElementById("ua-filter-btn");
@@ -2592,10 +2651,10 @@ async function uaToggleFilter(){
     const r = await apiPost("media/nofilter", {on: !_uaFilterOn});
     if (r && "on" in r) {
       _uaFilterOn = !!r.on; uaFilterBtn();
-      uaToast(_uaFilterOn ? "已开启内容过滤：只显示免费公开视频" : "已关闭内容过滤（调试模式）：显示全部搜索结果，付费内容无法播放");
+      toast(_uaFilterOn ? "已开启内容过滤：只显示免费公开视频" : "已关闭内容过滤（调试模式）：显示全部搜索结果，付费内容无法播放");
       if (window.uaVSearch) uaVSearch();
     }
-  } catch(e) { uaToast("切换失败：" + (e && e.message || e)); }
+  } catch(e) { toast("切换失败：" + (e && e.message || e)); }
 }
 async function uaVSearch(){
   const q=$("#ua-vq").value.trim();
