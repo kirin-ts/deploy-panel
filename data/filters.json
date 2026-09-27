@@ -136,21 +136,5 @@
     "yangshipin.cn",
     "tv.cctv.cn"
   ],
-  "pirate_doms": [
-    "btbtdy.com",
-    "btbtdy.cc",
-    "dy2018.com",
-    "dytt8.net",
-    "dytt89.com",
-    "80s.tw",
-    "80s.la",
-    "okzyw.com",
-    "1080zyk.com",
-    "zxzj.pro",
-    "66s.cc",
-    "nfmovies.com",
-    "tvb123.com",
-    "qq7799.com",
-    "5dianying.com"
-  ]
+  "pirate_doms": []
 }
