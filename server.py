@@ -1879,6 +1879,53 @@ def _cls_tag(title):
     return "其他"
 
 
+_WEB_BLACK_DOM = ("baike.baidu", "zdic.net", "hanyuguoxue", "chinesewords.org", "jd.com",
+                    "taobao.com", "tmall.com", "dangdang.com", "39.net", "docin.com",
+                    "wenku.baidu", "cqvip", "wanfangdata", "dict.", "cnki",
+                    "jzvideo", "baiduvideo", "yingyuan", "qingse", "vod", "ppzy",
+                    "zuidazy", "maoyun", "kandian", "m3u8",
+                    "jjwxc", "qidian", "zhulang", "huayue", "biquge")
+_WEB_BLACK_TITLE = ("免费观看", "免费追剧", "高清影视", "影视大全", "在线影院", "免费影院",
+                    "影视资源", "海量片库", "蓝光画质", "电影天堂", "站长", "APP下载",
+                    "在线播放", "网盘资源")
+_WEB_VIDEO_HINT = (".mp4", ".webm", ".m3u8", "video/", "v.qq.com", "bilibili", "douyin",
+                   "ixigua", "youku", "iqiyi", "mgtv", "sohu", "163.com", "youtube",
+                   "vimeo", "dailymotion", "kuaishou", "weibo.com/tv", "le.com",
+                   "video.", "播放", "在线观看", "全集", "正片")
+
+def _web_video_search(q, page=1):
+    """Bing 通用网页搜索视频关键词，返回网页条目（标题/链接/摘要/域名）。
+    仅收集公开网页搜索结果，不采集个人隐私；条目需点击解析后由 yt-dlp 尝试播放。"""
+    kw = urllib.parse.quote(q + " 视频 在线观看")
+    u = "https://cn.bing.com/search?q=" + kw + "&count=15&first=" + str((page - 1) * 10)
+    hd = {"User-Agent": (_DL_UA_POOL[0] if isinstance(_DL_UA_POOL, list) and _DL_UA_POOL else "Mozilla/5.0"),
+          "Accept-Language": "zh-CN,zh;q=0.9", "Accept": "text/html,*/*;q=0.8"}
+    status, body = http_get(u, timeout=20, headers=hd)
+    if status != 200:
+        return {"ok": False, "error": "网页搜索接口异常（状态 %s）" % status}
+    html = body.decode("utf-8", "ignore")
+    items, seen = [], set()
+    for m in re.finditer(r'<li class="b_algo".*?<h2[^>]*><a[^>]*href="([^"]+)"[^>]*>(.*?)</a></h2>(.*?)</li>', html, re.S):
+        url = m.group(1).strip()
+        title = re.sub(r"<[^>]+>", "", m.group(2)).strip()
+        body_t = re.sub(r"<[^>]+>", " ", m.group(3))
+        body_t = re.sub(r"\s+", " ", body_t).strip()[:160]
+        if not url or not title or url in seen:
+            continue
+        low = url.lower()
+        if any(b in low for b in _WEB_BLACK_DOM):
+            continue
+        if any(k in title for k in _WEB_BLACK_TITLE):
+            continue
+        seen.add(url)
+        dom = (urllib.parse.urlparse(url).netloc or "").replace("www.", "")
+        items.append({"title": title[:120], "url": url, "domain": dom[:40],
+                      "summary": body_t, "hint": any(h in (title + body_t + low) for h in _WEB_VIDEO_HINT)})
+        if len(items) >= 12:
+            break
+    items.sort(key=lambda x: (0 if x["hint"] else 1))
+    return {"ok": True, "items": items, "total": len(items)}
+
 def _bili_search(stype, q, page=1):
     """B站 wbi 公开搜索，返回 (items, ok)"""
     items = []
@@ -2416,56 +2463,78 @@ def _yt_playinfo(u):
         raise RuntimeError("yt-dlp 未安装。请运行: python -m pip install yt-dlp 后重启面板。")
     import yt_dlp
     opts = {"quiet": True, "no_warnings": True, "noplaylist": True,
-            "socket_timeout": 30, "nocheckcertificate": True, "retries": 2}
+            "socket_timeout": 60, "nocheckcertificate": True, "retries": 3}
     with yt_dlp.YoutubeDL(opts) as ydl:
         info = ydl.extract_info(u, download=False)
     if not info:
         raise RuntimeError("未能解析该链接（可能需登录、版权/地区限制）")
     title = info.get("title") or info.get("id") or "视频"
     fmts = info.get("formats") or []
-    vpick = None
+    def _score(f_):
+        h = f_.get("height") or 0
+        v = f_.get("vcodec") or ""
+        return (1000000 if v.startswith("avc") else (500000 if "h264" in v else 0)) + h
+    # 一体流（音视频同文件）优先：避免 B站分离音频流（试看/占位）浏览器解码失败
+    comb = None
     for f in fmts:
         proto = f.get("protocol") or ""
         ext = f.get("ext") or ""
         vc = f.get("vcodec")
+        ac = f.get("acodec")
         if "m3u8" in proto:
             continue
         if ext not in ("mp4", "webm", "mov", "flv"):
             continue
-        if not vc or vc == "none":
+        if not vc or vc == "none" or not ac or ac == "none":
             continue
-        # 视频流：H264(avc1) 优先（浏览器可直接解码），其次选最高清
-        def _score(f_):
-            h = f_.get("height") or 0
-            v = f_.get("vcodec") or ""
-            return (1000000 if v.startswith("avc") else (500000 if "h264" in v else 0)) + h
-        if vpick is None or _score(f) > _score(vpick):
-            vpick = f
-    # 音频流：acodec 非 none，优选 aac/m4a
-    apick = None
-    for f in fmts:
-        ac = f.get("acodec")
-        if not ac or ac == "none":
-            continue
-        if f.get("vcodec") and f.get("vcodec") != "none":
-            continue  # 只要纯音频流
-        proto = f.get("protocol") or ""
-        if "m3u8" in proto:
-            continue
-        if apick is None:
-            apick = f
-    vurl = None
-    if vpick and vpick.get("url"):
-        vurl = vpick["url"]
-    elif info.get("url"):
-        vurl = info["url"]
+        if comb is None or _score(f) > _score(comb):
+            comb = f
+    vpick = comb
+    if comb and comb.get("url"):
+        vurl = comb["url"]
+        aurl = ""
+        acodec = comb.get("acodec") or ""
+    else:
+        # 无一体流：分离流（视频流 + 纯音频流）
+        vpick = None
+        for f in fmts:
+            proto = f.get("protocol") or ""
+            ext = f.get("ext") or ""
+            vc = f.get("vcodec")
+            if "m3u8" in proto:
+                continue
+            if ext not in ("mp4", "webm", "mov", "flv"):
+                continue
+            if not vc or vc == "none":
+                continue
+            if vpick is None or _score(f) > _score(vpick):
+                vpick = f
+        apick = None
+        for f in fmts:
+            ac = f.get("acodec")
+            if not ac or ac == "none":
+                continue
+            if f.get("vcodec") and f.get("vcodec") != "none":
+                continue
+            proto = f.get("protocol") or ""
+            if "m3u8" in proto:
+                continue
+            if apick is None:
+                apick = f
+        vurl = None
+        if vpick and vpick.get("url"):
+            vurl = vpick["url"]
+        elif info.get("url"):
+            vurl = info["url"]
+        aurl = apick.get("url") if apick and apick.get("url") else ""
+        acodec = (apick.get("acodec") if apick else "") or ""
     if not vurl:
         raise RuntimeError("未找到可播放的视频直链（可能需要登录或会员）")
-    aurl = apick.get("url") if apick and apick.get("url") else ""
     return {"title": title, "url": vurl, "aurl": aurl,
             "ext": (vpick.get("ext") if vpick else (info.get("ext") or "")) or "",
             "height": (vpick.get("height") if vpick else 0) or 0,
-            "vcodec": (vpick.get("vcodec") if vpick else "") or ""}
+            "vcodec": (vpick.get("vcodec") if vpick else "") or "",
+            "acodec": acodec}
 
 
 def _dl_ytdlp(u, ddir, prog=None, out_path=None, prefer_single=False):
@@ -2699,12 +2768,15 @@ def _play_worker(task):
         else:
             args += ["-map", "0:v", "-map", "0:a?"]
         vc = (info.get("vcodec") or "").lower()
+        # 音频统一转码 AAC（B站分离流 m4a copy 进 fMP4 会在浏览器解码失败）
         if vc and (vc.startswith("hvc") or vc.startswith("hev")):
             # HEVC 浏览器无法直接解码 → 转码 H264（画质 veryfast，可播优先）
             args += ["-c:v", "libx264", "-preset", "veryfast", "-crf", "23", "-pix_fmt", "yuv420p",
-                     "-c:a", "copy", "-movflags", "frag_keyframe+empty_moov", "-f", "mp4", out]
+                     "-c:a", "aac", "-b:a", "128k", "-ar", "44100",
+                     "-movflags", "frag_keyframe+empty_moov", "-f", "mp4", out]
         else:
-            args += ["-c", "copy", "-movflags", "frag_keyframe+empty_moov", "-f", "mp4", out]
+            args += ["-c:v", "copy", "-c:a", "aac", "-b:a", "128k", "-ar", "44100",
+                     "-movflags", "frag_keyframe+empty_moov", "-f", "mp4", out]
         with open(logf, "wb") as lg:
             proc = subprocess.Popen(args, stdout=lg, stderr=lg)
         while proc.poll() is None:
@@ -3180,31 +3252,50 @@ class Handler(BaseHTTPRequestHandler):
                 dl_root = os.path.normpath(os.path.join(WORKSPACES, "downloads"))
                 play_root = os.path.normpath(_PLAY_DIR)
                 real = os.path.normpath(fp)
-                if not (os.path.normcase(real).startswith(os.path.normcase(dl_root)) or os.path.normcase(real).startswith(os.path.normcase(play_root))) or not os.path.isfile(real):
+                in_dl = os.path.normcase(real).startswith(os.path.normcase(dl_root))
+                in_play = os.path.normcase(real).startswith(os.path.normcase(play_root))
+                if not (in_dl or in_play):
                     return self._send(404, b"not found", "text/plain; charset=utf-8")
+                def _play_task_done():
+                    with _PLAY_LOCK:
+                        for _t in _PLAY_TASKS.values():
+                            if _t.get("path") == real and _t.get("done"):
+                                return True
+                    return False
+                if not os.path.isfile(real):
+                    # 播放任务解析/启动中：等临时文件创建（最多 15s，播放器请求超时安全区）
+                    if in_play:
+                        deadline = time.time() + 15
+                        while time.time() < deadline and not os.path.isfile(real):
+                            time.sleep(0.15)
+                    if not os.path.isfile(real):
+                        return self._send(404, b"not found", "text/plain; charset=utf-8")
                 ext = os.path.splitext(real)[1].lower()
                 ctype = _PREVIEW_MIME.get(ext, "application/octet-stream")
                 size = os.path.getsize(real)
-                # 边下边播：请求的 range 超出当前已下载字节，且播放任务未完成 → 等待下载到该位置
-                if real.startswith(play_root):
+                # 文件刚创建（过小）且任务未完成：等有足够分片头（最多 8s）
+                if in_play and size < 2097152 and not _play_task_done():
+                    deadline = time.time() + 8
+                    while time.time() < deadline and os.path.getsize(real) < 2097152:
+                        if _play_task_done():
+                            break
+                        time.sleep(0.12)
+                    size = os.path.getsize(real)
+                # 边下边播：请求超出已下载位置且任务未完成 → 短等待（最多 15s）后立即返回当前数据，
+                # 播放器卡缓冲时由前端 reload 从当前位置续播
+                if in_play:
                     rng0 = self.headers.get("Range", "")
                     if rng0.startswith("bytes="):
                         mm = re.match(r"bytes=(\d*)-(\d*)", rng0)
                         if mm:
                             r_end = int(mm.group(2) or (size - 1))
-                            if r_end >= size:
+                            if r_end >= size and not _play_task_done():
                                 deadline = time.time() + 15
                                 while time.time() < deadline and os.path.getsize(real) <= r_end:
-                                    tdone = False
-                                    with _PLAY_LOCK:
-                                        for _t in _PLAY_TASKS.values():
-                                            if _t.get("path") == real and _t.get("done"):
-                                                tdone = True
-                                                break
-                                    if tdone:
+                                    if _play_task_done():
                                         break
                                     time.sleep(0.12)
-                size = os.path.getsize(real)
+                                size = os.path.getsize(real)
                 rng = self.headers.get("Range", "")
                 if rng.startswith("bytes="):
                     m = re.match(r"bytes=(\d*)-(\d*)", rng)
@@ -3212,16 +3303,20 @@ class Handler(BaseHTTPRequestHandler):
                         start = int(m.group(1) or 0)
                         end = int(m.group(2) or (size - 1))
                         if start >= size:
+                            if in_play and not _play_task_done():
+                                # 任务未完成：返回空 200（不 416），前端 reload 续播
+                                return self._send(200, b"", ctype, {"Accept-Ranges": "bytes", "Cache-Control": "no-store"})
                             return self._send(416, b"", "text/plain; charset=utf-8")
                         end = min(end, size - 1)
                         with open(real, "rb") as f:
                             f.seek(start)
                             body = f.read(end - start + 1)
                         return self._send(206, body, ctype, {"Content-Range": "bytes %d-%d/%d" % (start, end, size),
-                                                             "Accept-Ranges": "bytes"})
+                                                             "Accept-Ranges": "bytes",
+                                                             "Cache-Control": "no-store"})
                 with open(real, "rb") as f:
                     body = f.read()
-                return self._send(200, body, ctype, {"Accept-Ranges": "bytes"})
+                return self._send(200, body, ctype, {"Accept-Ranges": "bytes", "Cache-Control": "no-store"})
             if parsed.path == "/api/url/run_script":
                 return self._send(200, json.dumps(api_url_run_script(params), ensure_ascii=False).encode("utf-8"))
             if parsed.path == "/api/search":
@@ -3374,6 +3469,12 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(200, json.dumps(api_media_article(body), ensure_ascii=False).encode("utf-8"))
             if parsed.path == "/api/media/manga":
                 return self._send(200, json.dumps(api_media_manga(body), ensure_ascii=False).encode("utf-8"))
+            if parsed.path == "/api/media/websearch":
+                q = (body or {}).get("q", "")
+                page = int((body or {}).get("page") or 1)
+                if not q:
+                    return self._send(200, json.dumps({"ok": False, "error": "请输入关键词"}, ensure_ascii=False).encode("utf-8"))
+                return self._send(200, json.dumps(_web_video_search(q, page), ensure_ascii=False).encode("utf-8"))
             if parsed.path == "/api/url/play_prep":
                 return self._send(200, json.dumps(api_url_play_prep(body), ensure_ascii=False).encode("utf-8"))
             if parsed.path == "/api/url/dl_start":

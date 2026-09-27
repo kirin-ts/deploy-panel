@@ -497,6 +497,7 @@ input:focus,textarea:focus{outline:none;border-color:var(--accent)}
             <button class="btn btn-ghost btn-sm" data-src="video" onclick="uaVSource('video',this)">B站视频</button>
             <button class="btn btn-ghost btn-sm" data-src="live" onclick="uaVSource('live',this)">B站直播</button>
             <button class="btn btn-ghost btn-sm" data-src="bangumi" onclick="uaVSource('bangumi',this)">B站番剧</button>
+            <button class="btn btn-ghost btn-sm" data-src="web" onclick="uaVSource('web',this)">全网</button>
           </div>
           <div id="ua-vtags" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;align-items:center"></div>
           <div id="ua-vresults" style="margin-top:8px;display:flex;flex-direction:column;gap:6px"></div>
@@ -2493,10 +2494,30 @@ async function uaPlayPrep(u,title){
   // 立即用临时路径播放（后端 preview 会等待未下载部分，边下边播）
   const v=$("#ua-play-video");
   if(window._uaPlayTmp){
-    v.src="api/url/preview?path="+encodeURIComponent(window._uaPlayTmp);
     v.style.display="";
     v.muted=true;
-    v.play().catch(()=>{});
+    if(!window._uaPlayReloadBound){
+      window._uaPlayReloadBound=true;
+      // 边下边播：播放器在"已下载末尾"结束/卡缓冲时，重新加载从当前位置续播（带防抖）
+      const uaPlayReload=()=>{
+        if(window._uaPlayDone||!window._uaPlayTid)return;
+        const now=Date.now();
+        if(window._uaPlayLastReload&&now-window._uaPlayLastReload<2500)return;
+        window._uaPlayLastReload=now;
+        const t=v.currentTime;
+        // 重新加载（数据已更多），等元数据就绪后再跳回当前位置续播
+        v.load();
+        const _onMeta=()=>{
+          v.removeEventListener("loadedmetadata",_onMeta);
+          try{ if(t>0){v.currentTime=Math.min(t,(v.duration||t));} }catch(e){}
+          v.play().catch(()=>{});
+        };
+        v.addEventListener("loadedmetadata",_onMeta);
+      };
+      v.addEventListener("ended",uaPlayReload);
+      v.addEventListener("stalled",uaPlayReload);
+      v.addEventListener("waiting",uaPlayReload);
+    }
   }
   const t0=Date.now();
   const iv=setInterval(async()=>{
@@ -2505,14 +2526,21 @@ async function uaPlayPrep(u,title){
     if(p.done){
       clearInterval(iv);
       if(p.error){uaPlayClose();toast(p.error||"该内容无法准备播放（可能需登录或会员）");return;}
+      window._uaPlayDone=true;
       window._uaPlayTmp=p.path;
       $("#ua-play-prog").style.display="none";
       if(!v.src){v.src="api/url/preview?path="+encodeURIComponent(p.path);v.style.display="";v.play().catch(()=>{});}
+      else if(v.readyState<2){v.load();v.play().catch(()=>{});}  // 下载中已尝试播放但未就绪：重载完整文件
       return;
     }
     const mb=(p.bytes_done||0)/1048576;
     $("#ua-play-prog-bar").style.width=Math.max(4,Math.min(100,(p.pct>0?p.pct:4)))+"%";
-    $("#ua-play-prog-txt").textContent="正在加载视频"+(mb>0?" "+mb.toFixed(1)+" MB":"");
+    $("#ua-play-prog-txt").textContent=(mb>0?"正在加载视频 "+mb.toFixed(1)+" MB":"正在解析视频地址（番剧解析较慢，请耐心等待）");
+    // 文件有数据后再给播放器 src，避免 0 字节/未创建时请求失败
+    if(!v.src&&window._uaPlayTmp&&(p.bytes_done>0||p.done)){
+      v.src="api/url/preview?path="+encodeURIComponent(window._uaPlayTmp);
+      v.play().catch(()=>{});
+    }
   },700);
 }
 function uaPlayClose(){
@@ -2523,6 +2551,7 @@ function uaPlayClose(){
   const tmp=window._uaPlayTmp;
   window._uaPlayTmp=null;
   window._uaPlayTid=null;
+  window._uaPlayDone=false;
   if(tmp){api("url/play_clean",{path:tmp}).then(()=>{});}
 }
 
@@ -2546,8 +2575,11 @@ async function uaVSearch(){
   if(!q){toast("请输入关键词");return;}
   const box=$("#ua-vresults");
   box.innerHTML='<span style="color:var(--text2);font-size:12px">搜索中…</span>';
-  const r=await api("video/search",{q:q,source:window._uaVSource});
+  const r = window._uaVSource==="web"
+    ? await apiPost("media/websearch",{q:q})
+    : await api("video/search",{q:q,source:window._uaVSource});
   if(!r.ok){box.innerHTML='<span style="color:#e07b7b;font-size:12px">'+(r.error||"搜索失败")+'</span>';return;}
+  if(window._uaVSource==="web"){uaWebRender(r);return;}
   window._uaVItems=r.items||[];
   window._uaVTags=r.tags||[];
   window._uaVTag="";
@@ -2557,6 +2589,37 @@ async function uaVSearch(){
   tbox.innerHTML='<span style="color:var(--text2);font-size:12px">分类：</span>'+allBtn+
     (window._uaVTags||[]).map(t=>'<button class="btn btn-sm btn-ghost" data-tag="'+esc(t.name)+'" onclick="uaVTag(\''+esc(t.name)+'\',this)">'+esc(t.name)+' ('+t.count+')</button>').join("");
   uaVRender();
+}
+function uaWebRender(r){
+  const box=$("#ua-vresults");
+  const items=r.items||[];
+  $("#ua-vtags").innerHTML='';
+  let html='<span style="color:var(--text2);font-size:12px">全网网页搜索 '+items.length+' 条（点击「解析播放」尝试在线播放，仅限公开内容）</span>';
+  if(!items.length){html+='<div style="color:var(--text2);font-size:12px;margin-top:6px">未找到结果，可换关键词</div>';}
+  items.forEach((it,i)=>{
+    html+='<div class="ua-card" style="padding:8px;margin-top:6px">'+
+      '<div style="font-size:13px;font-weight:600">'+esc(it.title)+'</div>'+
+      '<div style="color:var(--text2);font-size:12px;margin-top:2px">'+esc(it.domain)+(it.hint?'<span style="color:#4fd08a;margin-left:6px">疑似视频页</span>':'')+'</div>'+
+      '<div style="color:var(--text2);font-size:12px;margin-top:2px">'+esc(it.summary||"")+'</div>'+
+      '<div style="display:flex;gap:6px;margin-top:6px">'+
+      '<button class="btn btn-sm" style="border-color:#4fd08a;color:#4fd08a" onclick="uaWebPlay('+i+')">▶ 解析播放</button>'+
+      '<button class="btn btn-sm" style="border-color:var(--accent);color:var(--accent)" onclick="uaWebDl('+i+')">下载</button>'+
+      '<a class="btn btn-sm" style="text-decoration:none;border-color:var(--text2);color:var(--text2)" href="'+esc(it.url)+'" target="_blank" rel="noopener">打开原网页</a>'+
+      '</div></div>';
+  });
+  box.innerHTML=html;
+  window._uaWebItems=items;
+}
+function uaWebPlay(i){
+  const it=(window._uaWebItems||[])[i]; if(!it)return;
+  toast("正在解析 "+it.domain+" 的视频…");
+  uaPlayOpen(it.url);
+}
+function uaWebDl(i){
+  const it=(window._uaWebItems||[])[i]; if(!it)return;
+  const r=window.confirm("下载该网页中的视频？仅公开内容："+it.title.slice(0,40));
+  if(!r)return;
+  apiPost("url/dl_start",{urls:[it.url],mode:"auto"}).then(x=>{toast(x.ok?"已加入下载队列，可在下载资源查看进度":(x.error||"加入失败"));});
 }
 function uaVSource(s,btn){
   window._uaVSource=s;
