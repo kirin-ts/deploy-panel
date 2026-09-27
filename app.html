@@ -534,7 +534,7 @@ input:focus,textarea:focus{outline:none;border-color:var(--accent)}
       </div>
       <div id="app-dbview" class="hidden" style="margin-top:12px">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
-          <b style="font-size:13px">🗄 运行数据（宝塔式：点击单元格直接编辑）</b>
+          <b style="font-size:13px">🗄 运行数据（点击单元格直接编辑）</b>
           <div>
             <button class="btn btn-ghost btn-sm" onclick="dbNewTable()">＋ 新建表</button>
             <button class="btn btn-ghost btn-sm" onclick="refreshDbView()">🔄 刷新</button>
@@ -1834,7 +1834,7 @@ async function refreshDbView(){
       '</tbody></table><div class="dbcard-foot"><button class="btn btn-ghost btn-xs" data-act="addrow" data-tbl="'+esc(t.name)+'">＋ 添加一行</button></div></div>';
   }).join('');
 }
-// —— 宝塔式数据库编辑（事件委托，避免 inline onclick 转义问题）——
+// —— 数据库可视化编辑（事件委托，避免 inline onclick 转义问题）——
 (function(){
   const body=$("#app-dbview-body");
   body.addEventListener("click",function(ev){

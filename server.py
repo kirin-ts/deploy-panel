@@ -1,6 +1,6 @@
 # -*- coding: utf-8 -*-
 """
-DeployPanel · 宝塔式 GitHub 项目一键部署面板（本地服务）
+DeployPanel · GitHub 项目一键部署面板（本地服务）
 零第三方依赖，Python 3.8+ 标准库实现。
 功能：GitHub 搜索 / 许可证识别 / GPL 律师审核 / 下载解压 / 环境自动检测 / 一键部署 / 环境打包带走 / 离线模式
 启动：python server.py  →  浏览器打开 http://127.0.0.1:8787
