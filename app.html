@@ -444,6 +444,22 @@ input:focus,textarea:focus{outline:none;border-color:var(--accent)}
             <div id="ua-files" style="margin-top:6px;display:flex;flex-direction:column;gap:3px"></div>
           </div>
         </div>
+        <div id="ua-vsearch" class="ua-card">
+          <b>🎬 公开视频聚合搜索（仅公开/免费内容 · 付费会员内容不索引）</b>
+          <div style="display:flex;gap:6px;margin-top:8px">
+            <input id="ua-vq" class="input" placeholder="输入关键词，如：机器学习 入门" style="flex:1">
+            <button class="btn btn-primary btn-sm" onclick="uaVSearch()">搜索</button>
+          </div>
+          <div id="ua-vq-sug" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px">
+            <span style="color:var(--text2);font-size:12px;line-height:24px">热门：</span>
+            <button class="btn btn-ghost btn-sm" onclick="uaVQ('公开课')">公开课</button>
+            <button class="btn btn-ghost btn-sm" onclick="uaVQ('教程')">教程</button>
+            <button class="btn btn-ghost btn-sm" onclick="uaVQ('纪录片')">纪录片</button>
+            <button class="btn btn-ghost btn-sm" onclick="uaVQ('前端')">前端</button>
+            <button class="btn btn-ghost btn-sm" onclick="uaVQ('Python')">Python</button>
+          </div>
+          <div id="ua-vresults" style="margin-top:8px;display:flex;flex-direction:column;gap:6px"></div>
+        </div>
         <div id="ua-script-recs" class="ua-card hidden">
           <b>🧩 脚本推荐（选择方案自动生成可运行爬虫）</b>
           <div id="ua-script-list" style="margin-top:8px;display:flex;flex-direction:column;gap:6px"></div>
@@ -2374,6 +2390,54 @@ async function uaPlay(){
 function uaPlayClose(){
   const pv=$("#ua-play-video"); pv.pause(); pv.removeAttribute("src"); pv.load();
   $("#ua-play-mask").classList.add("hidden");
+}
+
+
+async function uaVSearch(){
+  const q=$("#ua-vq").value.trim();
+  if(!q){toast("请输入关键词");return;}
+  const box=$("#ua-vresults");
+  box.innerHTML='<span style="color:var(--text2);font-size:12px">搜索中…</span>';
+  const r=await api("video/search",{q:q});
+  if(!r.ok){box.innerHTML='<span style="color:#e07b7b;font-size:12px">'+(r.error||"搜索失败")+'</span>';return;}
+  const srcs=r.sources?("（来源："+r.sources.join(" / ")+"）"):"";
+  box.innerHTML='<span style="color:var(--text2);font-size:12px">找到 '+r.items.length+' 条公开内容 '+srcs+'</span>'+
+    r.items.map((it,i)=>'<div class="ua-card" style="padding:8px;margin-top:6px">'+
+      '<div style="font-size:13px;font-weight:600">'+esc(it.title)+'</div>'+
+      '<div style="color:var(--text2);font-size:12px;margin-top:2px">'+esc(it.platform)+' · '+esc(it.author||"-")+' · '+esc(it.duration||"-")+'</div>'+
+      '<div style="display:flex;gap:6px;margin-top:6px">'+
+      '<button class="btn btn-sm" style="border-color:#4fd08a;color:#4fd08a" onclick="uaVPlay('+i+')">▶ 播放</button>'+
+      '<button class="btn btn-sm" style="border-color:var(--accent);color:var(--accent)" onclick="uaVDl('+i+')">下载</button>'+
+      '</div></div>').join("");
+  window._uaVItems=r.items;
+}
+function uaVQ(t){$("#ua-vq").value=t;uaVSearch();}
+function uaVPlay(i){
+  const it=(window._uaVItems||[])[i]; if(!it)return;
+  if(window._uaSecLevel==="danger"){toast("危险站点已禁止");return;}
+  toast("提取直链中…（约 5-15 秒）");
+  api("url/playinfo",{url:it.url}).then(r=>{
+    if(!r.ok){toast(r.error||"该内容暂不支持直接播放（可能需登录或会员）");return;}
+    $("#ua-play-title").textContent=r.title+(r.height?(" · "+r.height+"p"):"");
+    $("#ua-play-video").src="api/url/play?url="+encodeURIComponent(r.url)+"&ref="+encodeURIComponent(it.url);
+    $("#ua-play-mask").classList.remove("hidden");
+    $("#ua-play-video").play().catch(()=>{});
+  });
+}
+function uaVDl(i){
+  const it=(window._uaVItems||[])[i]; if(!it)return;
+  toast("提交下载…");
+  uaDlStartWith(it.url);
+}
+
+
+function uaDlStartWith(u){
+  if(typeof uaDlStart==="function"){
+    const old=$("#ua-vurl").value;
+    $("#ua-vurl").value=u;
+    uaDlStart();
+    $("#ua-vurl").value=old;
+  } else { toast("下载模块未就绪"); }
 }
 
 </script>

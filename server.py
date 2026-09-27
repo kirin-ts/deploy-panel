@@ -1695,6 +1695,74 @@ def _detect_platform(host):
     return ""
 
 
+def api_video_search(params):
+    """公开视频聚合搜索：主通道 B站公开搜索接口（无需登录），可选 yt-dlp(ytsearch)。
+    仅返回公开内容；付费/会员内容不索引。"""
+    q = str(params.get("q") or "").strip()
+    if not q:
+        return {"ok": False, "error": "请输入关键词"}
+    page = int(params.get("page") or 1)
+    items = []
+    srcs = []
+    # 通道1：B站公开搜索（wbi 端点，带 UA/Referer）
+    try:
+        kw = urllib.parse.quote(q)
+        u = "https://api.bilibili.com/x/web-interface/wbi/search/type?search_type=video&keyword=" + kw + "&page=" + str(min(page, 50))
+        hd = {"User-Agent": _DL_UA_POOL[0] if isinstance(_DL_UA_POOL, list) and _DL_UA_POOL else "Mozilla/5.0",
+              "Referer": "https://www.bilibili.com/"}
+        status, body = http_get(u, timeout=15, headers=hd)
+        if status == 200:
+            d = json.loads(body.decode("utf-8", "replace"))
+            if d.get("code") == 0:
+                res = (d.get("data") or {}).get("result") or []
+                for it in res[:30]:
+                    arcurl = it.get("arcurl") or ""
+                    # 边界：排除 B站课堂/付费内容（cheese）
+                    if "cheese" in arcurl.lower() or "bilibili.com/cheese" in arcurl.lower():
+                        continue
+                    title = re.sub(r"<[^>]+>", "", it.get("title") or "")
+                    bvid = it.get("bvid") or ""
+                    dur = it.get("duration") or ""
+                    dur_txt = dur if isinstance(dur, str) and ":" in dur else (str(int(dur) // 60) + ":" + str(int(dur) % 60).zfill(2)) if str(dur).isdigit() else ""
+                    items.append({
+                        "platform": "B站", "title": title,
+                        "url": arcurl or ("https://www.bilibili.com/video/" + bvid),
+                        "bv": bvid, "duration": dur_txt,
+                        "author": it.get("author") or "",
+                        "play": it.get("play") or 0,
+                    })
+                if items:
+                    srcs.append("B站公开搜索")
+    except Exception:
+        pass
+    # 通道2：yt-dlp ytsearch（网络可达时自动生效）
+    if not items:
+        try:
+            if YTDLP_AVAILABLE:
+                import yt_dlp
+                opts = {"quiet": True, "no_warnings": True, "noplaylist": True,
+                        "socket_timeout": 12, "nocheckcertificate": True, "retries": 1}
+                with yt_dlp.YoutubeDL(opts) as ydl:
+                    info = ydl.extract_info("ytsearch5:" + q, download=False)
+                for e in (info.get("entries") or [])[:5]:
+                    if not e or not e.get("webpage_url"):
+                        continue
+                    dur = e.get("duration") or 0
+                    items.append({
+                        "platform": "YouTube", "title": (e.get("title") or "")[:120],
+                        "url": e.get("webpage_url"), "bv": "",
+                        "duration": str(int(dur) // 60) + ":" + str(int(dur) % 60).zfill(2) if dur else "",
+                        "author": (e.get("uploader") or ""), "play": 0,
+                    })
+                if items:
+                    srcs.append("YouTube 公开搜索")
+        except Exception:
+            pass
+    if not items:
+        return {"ok": False, "error": "公开搜索暂不可用（B站接口或网络异常）；可去平台站内搜索后把链接粘贴到下方直接播放/下载"}
+    return {"ok": True, "items": items, "sources": srcs, "note": "仅索引公开/免费内容；付费会员内容不在结果中"}
+
+
 def api_url_playinfo(params):
     """GET url=... → yt-dlp 提取直链（公开视频直接播放用）"""
     u = str(params.get("url") or "").strip()
@@ -2683,6 +2751,8 @@ class Handler(BaseHTTPRequestHandler):
             if parsed.path == "/" or parsed.path == "/index.html" or parsed.path == "/app.html":
                 with open(os.path.join(BASE, "app.html"), "rb") as f:
                     return self._send(200, f.read(), "text/html; charset=utf-8")
+            if parsed.path == "/api/video/search":
+                return self._send(200, json.dumps(api_video_search(params), ensure_ascii=False).encode("utf-8"))
             if parsed.path == "/api/url/playinfo":
                 return self._send(200, json.dumps(api_url_playinfo(params), ensure_ascii=False).encode("utf-8"))
             if parsed.path == "/api/url/play":
