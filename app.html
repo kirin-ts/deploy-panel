@@ -483,6 +483,14 @@ input:focus,textarea:focus{outline:none;border-color:var(--accent)}
             <button class="btn btn-ghost btn-sm" onclick="uaVQ('前端')">前端</button>
             <button class="btn btn-ghost btn-sm" onclick="uaVQ('Python')">Python</button>
           </div>
+          <div id="ua-vsrcs" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;align-items:center">
+            <span style="color:var(--text2);font-size:12px">平台：</span>
+            <button class="btn btn-ghost btn-sm" data-src="all" onclick="uaVSource('all',this)">全平台</button>
+            <button class="btn btn-ghost btn-sm" data-src="video" onclick="uaVSource('video',this)">B站视频</button>
+            <button class="btn btn-ghost btn-sm" data-src="live" onclick="uaVSource('live',this)">B站直播</button>
+            <button class="btn btn-ghost btn-sm" data-src="bangumi" onclick="uaVSource('bangumi',this)">B站番剧</button>
+          </div>
+          <div id="ua-vtags" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;align-items:center"></div>
           <div id="ua-vresults" style="margin-top:8px;display:flex;flex-direction:column;gap:6px"></div>
         </div>
 
@@ -2501,23 +2509,66 @@ function uaPlayClose(){
 }
 
 
+window._uaVSource="all";
+window._uaVTag="";
 async function uaVSearch(){
   const q=$("#ua-vq").value.trim();
   if(!q){toast("请输入关键词");return;}
   const box=$("#ua-vresults");
   box.innerHTML='<span style="color:var(--text2);font-size:12px">搜索中…</span>';
-  const r=await api("video/search",{q:q});
+  const r=await api("video/search",{q:q,source:window._uaVSource});
   if(!r.ok){box.innerHTML='<span style="color:#e07b7b;font-size:12px">'+(r.error||"搜索失败")+'</span>';return;}
-  const srcs=r.sources?("（来源："+r.sources.join(" / ")+"）"):"";
-  box.innerHTML='<span style="color:var(--text2);font-size:12px">找到 '+r.items.length+' 条公开内容 '+srcs+'</span>'+
-    r.items.map((it,i)=>'<div class="ua-card" style="padding:8px;margin-top:6px">'+
-      '<div style="font-size:13px;font-weight:600">'+esc(it.title)+'</div>'+
-      '<div style="color:var(--text2);font-size:12px;margin-top:2px">'+esc(it.platform)+' · '+esc(it.author||"-")+' · '+esc(it.duration||"-")+'</div>'+
-      '<div style="display:flex;gap:6px;margin-top:6px">'+
-      '<button class="btn btn-sm" style="border-color:#4fd08a;color:#4fd08a" onclick="uaVPlay('+i+')">▶ 播放</button>'+
-      '<button class="btn btn-sm" style="border-color:var(--accent);color:var(--accent)" onclick="uaVDl('+i+')">下载</button>'+
-      '</div></div>').join("");
-  window._uaVItems=r.items;
+  window._uaVItems=r.items||[];
+  window._uaVTags=r.tags||[];
+  window._uaVTag="";
+  // 分类筛选 chips
+  const tbox=$("#ua-vtags");
+  const allBtn='<button class="btn btn-sm '+(window._uaVTag===""?"btn-primary":"btn-ghost")+'" onclick="uaVTag(\'\',this)">全部</button>';
+  tbox.innerHTML='<span style="color:var(--text2);font-size:12px">分类：</span>'+allBtn+
+    (window._uaVTags||[]).map(t=>'<button class="btn btn-sm btn-ghost" data-tag="'+esc(t.name)+'" onclick="uaVTag(\''+esc(t.name)+'\',this)">'+esc(t.name)+' ('+t.count+')</button>').join("");
+  uaVRender();
+}
+function uaVSource(s,btn){
+  window._uaVSource=s;
+  document.querySelectorAll("#ua-vsrcs .btn").forEach(b=>b.classList.remove("btn-primary"));
+  if(btn){btn.classList.add("btn-primary");}
+  uaVSearch();
+}
+function uaVTag(t,btn){
+  window._uaVTag=t;
+  document.querySelectorAll("#ua-vtags .btn").forEach(b=>b.classList.remove("btn-primary"));
+  if(btn){btn.classList.add("btn-primary");}
+  uaVRender();
+}
+function uaVRender(){
+  const box=$("#ua-vresults");
+  const items=(window._uaVItems||[]);
+  const srcs=window._uaVSourceInfo||"";
+  const filtered = window._uaVTag ? items.filter(it=>it.tag===window._uaVTag) : items;
+  // 按分类分组
+  const groups={};
+  filtered.forEach(it=>{ (groups[it.tag||"其他"]=groups[it.tag||"其他"]||[]).push(it); });
+  const keys=Object.keys(groups);
+  let html='<span style="color:var(--text2);font-size:12px">找到 '+filtered.length+' 条公开内容'+(window._uaVTag?('（分类：'+window._uaVTag+'）'):'')+'</span>';
+  if(!filtered.length){html+='<div style="color:var(--text2);font-size:12px;margin-top:6px">该分类暂无内容，可切回「全部」查看</div>';}
+  keys.forEach(tag=>{
+    const g=groups[tag];
+    html+='<div style="margin-top:10px"><div style="font-size:12px;font-weight:700;color:var(--accent);margin-bottom:4px">▍'+esc(tag)+' · '+g.length+' 条</div>';
+    g.forEach((it,i)=>{
+      const gi=items.indexOf(it);
+      html+='<div class="ua-card" style="padding:8px;margin-top:6px">'+
+        '<div style="font-size:13px;font-weight:600">'+esc(it.title)+'</div>'+
+        '<div style="color:var(--text2);font-size:12px;margin-top:2px">'+esc(it.platform)+' · '+esc(it.author||"-")+' · '+esc(it.duration||"-")+'</div>'+
+        '<div style="display:flex;gap:6px;margin-top:6px">'+
+        '<button class="btn btn-sm" style="border-color:#4fd08a;color:#4fd08a" onclick="uaVPlay('+gi+')">▶ 播放</button>'+
+        '<button class="btn btn-sm" style="border-color:var(--accent);color:var(--accent)" onclick="uaVDl('+gi+')">下载</button>'+
+        '</div></div>';
+    });
+    html+='</div>';
+  });
+  box.innerHTML=html;
+  // 记录来源信息
+  if(window._uaVLastR && window._uaVLastR.sources){window._uaVSourceInfo="（来源："+window._uaVLastR.sources.join(" / ")+"）";}
 }
 function uaVQ(t){$("#ua-vq").value=t;uaVSearch();}
 function uaVPlay(i){

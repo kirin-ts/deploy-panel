@@ -1804,87 +1804,119 @@ def api_media_manga(params):
         return {"ok": False, "error": "抓取失败：" + str(e)[:150]}
 
 
+
+def _cls_tag(title):
+    """按标题关键词给内容分类（教程/音乐MV/解说/剪辑合集/纪录片/影视剧集/游戏/直播/其他）"""
+    t = (title or "").lower()
+    rules = [
+        ("音乐MV", ["mv", "音乐", "歌曲", "演唱", "歌单", "ost", "主题曲", "片尾曲", " live", "live版", "翻唱", "纯音乐", "伴奏"]),
+        ("直播", ["直播", "开播", "live 房间"]),
+        ("教程", ["教程", "课程", "入门", "教学", "实战", "从零", "lesson", "tutorial", "公开课", "讲座", "系列教程", "带做"]),
+        ("解说", ["解说", "解析", "reaction", "盘点", "评测", "影评", "杂谈", "解读", "一口气看完", "带你看", "深度解读"]),
+        ("剪辑合集", ["混剪", "剪辑", "合集", "精选", "踩点", "燃向", "多p", "大赏"]),
+        ("纪录片", ["纪录片", "纪实", "考古", "全景"]),
+        ("影视剧集", ["第1集", "第2集", "第3集", "第4集", "第5集", "第6集", "第7集", "第8集", "第9集", "第10集",
+                       "第11集", "第12集", "第13集", "第14集", "第15集", "第16集", "第17集", "第18集", "第19集", "第20集",
+                       "全集", "完整版", "正片", "预告", "电影", "电视剧", "番剧", "剧集", "花絮", "cut"]),
+        ("游戏", ["游戏", "攻略", "实况", "原神", "王者", "我的世界", "minecraft", "英雄联盟", "lol", "吃鸡", "元神"]),
+    ]
+    if re.search(r"第[0-9一二三四五六七八九十百零]+[集话期]|更新至|连载|大结局|终章", t):
+        return "影视剧集"
+    for name, kws in rules:
+        for k in kws:
+            if k in t:
+                return name
+    return "其他"
+
+
+def _bili_search(stype, q, page=1):
+    """B站 wbi 公开搜索，返回 (items, ok)"""
+    items = []
+    kw = urllib.parse.quote(q)
+    u = ("https://api.bilibili.com/x/web-interface/wbi/search/type?search_type=" + stype
+         + "&keyword=" + kw + "&page=" + str(min(page, 50)))
+    hd = {"User-Agent": (_DL_UA_POOL[0] if isinstance(_DL_UA_POOL, list) and _DL_UA_POOL else "Mozilla/5.0"),
+          "Referer": "https://www.bilibili.com/"}
+    status, body = http_get(u, timeout=15, headers=hd)
+    if status != 200:
+        return items, False
+    d = json.loads(body.decode("utf-8", "replace"))
+    if d.get("code") != 0:
+        return items, False
+    res = (d.get("data") or {}).get("result") or []
+    for it in res[:30]:
+        title = re.sub(r"<[^>]+>", "", it.get("title") or "")
+        if stype == "video":
+            arcurl = it.get("arcurl") or ""
+            if "cheese" in arcurl.lower() or "bilibili.com/cheese" in arcurl.lower():
+                continue
+            bvid = it.get("bvid") or ""
+            dur = it.get("duration") or ""
+            dur_txt = dur if isinstance(dur, str) and ":" in dur else (str(int(dur) // 60) + ":" + str(int(dur) % 60).zfill(2)) if str(dur).isdigit() else ""
+            items.append({"platform": "B站", "kind": "video", "title": title,
+                          "url": arcurl or ("https://www.bilibili.com/video/" + bvid),
+                          "bv": bvid, "duration": dur_txt, "author": it.get("author") or "",
+                          "play": it.get("play") or 0})
+        elif stype == "article":
+            cid = it.get("id") or ""
+            art_url = it.get("arcurl") or it.get("url") or (("https://www.bilibili.com/read/cv" + str(cid)) if cid else "")
+            pub = str(it.get("pubdate") or it.get("pub_time") or "")[:10]
+            items.append({"platform": "B站专栏", "kind": "article", "title": title,
+                          "url": art_url, "bv": "", "duration": ((it.get("author") or "") + (" · " + pub if pub else "")),
+                          "author": it.get("author") or "", "play": it.get("view") or 0})
+        elif stype == "live":
+            roomid = it.get("roomid") or ""
+            online = it.get("online") or 0
+            items.append({"platform": "B站直播", "kind": "live", "title": title,
+                          "url": ("https://live.bilibili.com/" + str(roomid)) if roomid else "",
+                          "bv": "", "duration": "在线 " + str(online) + " 人",
+                          "author": it.get("uname") or "", "play": 0})
+        elif stype == "media_bangumi":
+            sid = it.get("season_id") or ""
+            mid = it.get("media_id") or ""
+            items.append({"platform": "B站番剧", "kind": "bangumi", "title": title,
+                          "url": ("https://www.bilibili.com/bangumi/play/ss" + str(sid)) if sid else (("https://www.bilibili.com/bangumi/media/md" + str(mid)) if mid else ""),
+                          "bv": "", "duration": ",".join((it.get("areas") or [])[:2]),
+                          "author": it.get("type_name") or "", "play": it.get("order") or 0})
+    return items, True
+
+
+
 def api_video_search(params):
-    """公开视频聚合搜索：主通道 B站公开搜索接口（无需登录），可选 yt-dlp(ytsearch)。
+    """公开视频聚合搜索：B站多类别（视频/直播/番剧/专栏）聚合 + 内容分类。
     仅返回公开内容；付费/会员内容不索引。"""
     q = str(params.get("q") or "").strip()
     if not q:
         return {"ok": False, "error": "请输入关键词"}
     page = int(params.get("page") or 1)
-    stype = str(params.get("type") or "video")
-    if stype not in ("video", "article"):
-        stype = "video"
+    src = str(params.get("source") or "all")
+    want = {"all": ["video", "live", "media_bangumi"],
+            "video": ["video"], "live": ["live"], "bangumi": ["media_bangumi"], "article": ["article"]}.get(src, ["video"])
     items = []
     srcs = []
-    # 通道1：B站公开搜索（wbi 端点，带 UA/Referer）
-    try:
-        kw = urllib.parse.quote(q)
-        u = "https://api.bilibili.com/x/web-interface/wbi/search/type?search_type=" + stype + "&keyword=" + kw + "&page=" + str(min(page, 50))
-        hd = {"User-Agent": _DL_UA_POOL[0] if isinstance(_DL_UA_POOL, list) and _DL_UA_POOL else "Mozilla/5.0",
-              "Referer": "https://www.bilibili.com/"}
-        status, body = http_get(u, timeout=15, headers=hd)
-        if status == 200:
-            d = json.loads(body.decode("utf-8", "replace"))
-            if d.get("code") == 0:
-                res = (d.get("data") or {}).get("result") or []
-                for it in res[:30]:
-                    arcurl = it.get("arcurl") or ""
-                    # 边界：排除 B站课堂/付费内容（cheese）
-                    if "cheese" in arcurl.lower() or "bilibili.com/cheese" in arcurl.lower():
-                        continue
-                    title = re.sub(r"<[^>]+>", "", it.get("title") or "")
-                    if stype == "article":
-                        cid = it.get("id") or ""
-                        art_url = arcurl or it.get("url") or (("https://www.bilibili.com/read/cv" + str(cid)) if cid else "")
-                        pub = str(it.get("pubdate") or it.get("pub_time") or "")[:10]
-                        items.append({
-                            "platform": "B站专栏", "title": title,
-                            "url": art_url,
-                            "bv": "", "duration": ((it.get("author") or "") + (" · " + pub if pub else "")),
-                            "author": it.get("author") or "",
-                            "play": it.get("view") or 0, "kind": "article",
-                        })
-                        continue
-                    bvid = it.get("bvid") or ""
-                    dur = it.get("duration") or ""
-                    dur_txt = dur if isinstance(dur, str) and ":" in dur else (str(int(dur) // 60) + ":" + str(int(dur) % 60).zfill(2)) if str(dur).isdigit() else ""
-                    items.append({
-                        "platform": "B站", "title": title,
-                        "url": arcurl or ("https://www.bilibili.com/video/" + bvid),
-                        "bv": bvid, "duration": dur_txt,
-                        "author": it.get("author") or "",
-                        "play": it.get("play") or 0,
-                    })
-                if items:
-                    srcs.append("B站公开搜索")
-    except Exception:
-        pass
-    # 通道2：yt-dlp ytsearch（网络可达时自动生效）
-    if not items:
+    for st in want:
         try:
-            if YTDLP_AVAILABLE:
-                import yt_dlp
-                opts = {"quiet": True, "no_warnings": True, "noplaylist": True,
-                        "socket_timeout": 12, "nocheckcertificate": True, "retries": 1}
-                with yt_dlp.YoutubeDL(opts) as ydl:
-                    info = ydl.extract_info("ytsearch5:" + q, download=False)
-                for e in (info.get("entries") or [])[:5]:
-                    if not e or not e.get("webpage_url"):
-                        continue
-                    dur = e.get("duration") or 0
-                    items.append({
-                        "platform": "YouTube", "title": (e.get("title") or "")[:120],
-                        "url": e.get("webpage_url"), "bv": "",
-                        "duration": str(int(dur) // 60) + ":" + str(int(dur) % 60).zfill(2) if dur else "",
-                        "author": (e.get("uploader") or ""), "play": 0,
-                    })
-                if items:
-                    srcs.append("YouTube 公开搜索")
+            its, ok = _bili_search(st, q, page)
         except Exception:
-            pass
+            its, ok = [], False
+        if its:
+            items.extend(its)
+            nm = {"video": "B站视频", "live": "B站直播", "media_bangumi": "B站番剧", "article": "B站专栏"}.get(st, st)
+            srcs.append(nm + "公开搜索")
+    # 每条内容打内容分类
+    for it in items:
+        it["tag"] = _cls_tag(it.get("title") or "")
+    tags = []
+    seen = {}
+    for it in items:
+        t = it["tag"]
+        seen[t] = seen.get(t, 0) + 1
+    tags = [{"name": k, "count": v} for k, v in seen.items()]
+    tags.sort(key=lambda x: -x["count"])
     if not items:
         return {"ok": False, "error": "公开搜索暂不可用（B站接口或网络异常）；可去平台站内搜索后把链接粘贴到下方直接播放/下载"}
-    return {"ok": True, "items": items, "sources": srcs, "note": "仅索引公开/免费内容；付费会员内容不在结果中"}
+    return {"ok": True, "items": items, "tags": tags, "sources": srcs,
+            "note": "仅索引公开/免费内容；付费会员内容不在结果中；多平台（YouTube/西瓜/爱奇艺）因接口需登录/签名或防盗链，暂不可稳定直连播放"}
 
 
 def api_url_playinfo(params):
