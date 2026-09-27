@@ -1895,12 +1895,12 @@ _WEB_VIDEO_DOMS = ("bilibili.com", "douyin.com", "ixigua.com", "youku.com", "iqi
                    "fun.tv", "cnmooc", "xue.taobao.com", "ke.qq.com", "cloud.tencent.com/edu")
 # 标题中出现的关键词 → 判定为视频内容
 _WEB_VIDEO_KW = ("视频", "在线观看", "全集", "高清", "完整版", "正片", "预告", "综艺", "剧集", "电影",
-                 "第1集", "第2集", "全集", "mv", "live", "纪录片", "公开课", "教程", "直播", "演唱会")
+                 "第1集", "第2集", "mv", "live", "纪录片", "公开课", "教程", "直播", "演唱会", "短视频")
 
 def _web_engine_bing(q):
     """Bing 网页搜索"""
     kw = urllib.parse.quote(q)
-    u = "https://cn.bing.com/search?q=" + kw + "&count=15"
+    u = "https://cn.bing.com/search?q=" + kw + "&count=30"
     hd = {"User-Agent": (_DL_UA_POOL[0] if isinstance(_DL_UA_POOL, list) and _DL_UA_POOL else "Mozilla/5.0"),
           "Accept-Language": "zh-CN,zh;q=0.9", "Accept-Encoding": "identity"}
     status, body = http_get(u, timeout=15, headers=hd)
@@ -1953,6 +1953,24 @@ def _web_engine_sogou(q):
             out.append({"title": title[:120], "url": url, "summary": ""})
     return out
 
+def _web_engine_360(q):
+    """360 网页搜索"""
+    kw = urllib.parse.quote(q)
+    u = "https://www.so.com/s?q=" + kw
+    hd = {"User-Agent": (_DL_UA_POOL[0] if isinstance(_DL_UA_POOL, list) and _DL_UA_POOL else "Mozilla/5.0"),
+          "Accept-Language": "zh-CN,zh;q=0.9", "Accept-Encoding": "identity"}
+    status, body = http_get(u, timeout=15, headers=hd)
+    if status != 200:
+        return []
+    html = body.decode("utf-8", "ignore")
+    out = []
+    for m in re.finditer(r'<h3[^>]*>\s*<a[^>]*href="([^"]+)"[^>]*>(.*?)</a>', html, re.S):
+        url = m.group(1).strip()
+        title = re.sub(r"<[^>]+>", "", m.group(2)).strip()
+        if url.startswith("http") and title:
+            out.append({"title": title[:120], "url": url, "summary": ""})
+    return out
+
 def _web_video_search(q, page=1):
     """全网视频搜索：多搜索引擎（Bing/百度/搜狗）并行抓取 → 融合去重 →
     按「视频平台域名 + 标题关键词」标记视频内容。仅公开网页，不采集个人隐私；
@@ -1961,7 +1979,7 @@ def _web_video_search(q, page=1):
     if not kw:
         return {"ok": False, "error": "请输入关键词"}
     raw = []
-    for eng in (_web_engine_bing, _web_engine_baidu, _web_engine_sogou):
+    for eng in (_web_engine_bing, _web_engine_baidu, _web_engine_sogou, _web_engine_360):
         try:
             raw += eng(kw)
         except Exception:
@@ -1981,16 +1999,16 @@ def _web_video_search(q, page=1):
         seen.add(key)
         dom = (urllib.parse.urlparse(url).netloc or "").replace("www.", "")
         title_low = it["title"].lower()
-        is_video = any(d in low for d in _WEB_VIDEO_DOMS) or any(k in title_low for k in _WEB_VIDEO_KW)
-        if not is_video:
-            continue  # 只保留视频类资源，过滤书籍/百科/官网等非视频页
+        lv = 2 if any(d in low for d in _WEB_VIDEO_DOMS) else (1 if any(k in title_low for k in _WEB_VIDEO_KW) else 0)
+        if lv == 0:
+            continue  # 非视频资源（书籍/百科/官网/词典等）过滤
         items.append({"title": it["title"][:120], "url": url, "domain": dom[:40],
                       "summary": it["summary"][:160],
-                      "hint": True,
-                      "engine": "必应/百度/搜狗"})
-        if len(items) >= 20:
+                      "hint": True, "level": lv,
+                      "engine": "必应/百度/搜狗/360"})
+        if len(items) >= 30:
             break
-    items.sort(key=lambda x: (0 if x["hint"] else 1, x["engine"]))
+    items.sort(key=lambda x: (-x.get("level", 0), x["engine"]))
     return {"ok": True, "items": items, "total": len(items), "engines": ["必应", "百度", "搜狗"]}
 
 def _bili_search(stype, q, page=1):
@@ -2089,7 +2107,19 @@ def api_url_playinfo(params):
     if not u.startswith(("http://", "https://")):
         return {"ok": False, "error": "请提供 http(s):// 链接"}
     try:
-        info = _yt_playinfo(u)
+        task.update(phase="解析中")
+        cached = _play_cache_get(u)
+        if cached is not None:
+            if cached.get("err"):
+                raise RuntimeError(cached["err"])
+            info = cached["info"] or {}
+        else:
+            try:
+                info = _yt_playinfo(u)
+            except Exception as pe:
+                _play_cache_put(u, err=str(pe)[:160])
+                raise
+            _play_cache_put(u, info=info)
         info["ok"] = True
         return info
     except Exception as e:
@@ -2530,7 +2560,8 @@ def _yt_playinfo(u):
         raise RuntimeError("yt-dlp 未安装。请运行: python -m pip install yt-dlp 后重启面板。")
     import yt_dlp
     opts = {"quiet": True, "no_warnings": True, "noplaylist": True,
-            "socket_timeout": 60, "nocheckcertificate": True, "retries": 3}
+            "socket_timeout": 18, "nocheckcertificate": True, "retries": 1,
+            "extractor_retries": 1}
     with yt_dlp.YoutubeDL(opts) as ydl:
         info = ydl.extract_info(u, download=False)
     if not info:
@@ -2865,6 +2896,20 @@ def _play_worker(task):
         except Exception:
             pass
 
+
+_PLAY_CACHE = {}  # url -> {"t": time, "info": dict, "err": str}
+_PLAY_CACHE_LOCK = threading.Lock()
+
+def _play_cache_get(u):
+    with _PLAY_CACHE_LOCK:
+        c = _PLAY_CACHE.get(u)
+        if c and time.time() - c["t"] < 600:
+            return c
+    return None
+
+def _play_cache_put(u, info=None, err=None):
+    with _PLAY_CACHE_LOCK:
+        _PLAY_CACHE[u] = {"t": time.time(), "info": info, "err": err}
 
 def api_url_play_prep(params):
     """POST {url} → 启动临时播放准备任务（完整拉取到 data/tmp_play）"""
