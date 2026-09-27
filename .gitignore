@@ -20,3 +20,6 @@ data/exports/
 _up_*.py
 _readme*.py
 _c*.js
+
+# 本地二进制依赖（ffmpeg 约 450MB，不入库；用户本机/导出包自带）
+bin/

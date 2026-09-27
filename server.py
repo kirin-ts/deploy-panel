@@ -6,11 +6,17 @@ DeployPanel · GitHub 项目一键部署面板（本地服务）
 # it under the terms of the GNU General Public License as published by
 # the Free Software Foundation, either version 3 of the License, or
 # (at your option) any later version. See LICENSE for details.
-零第三方依赖，Python 3.8+ 标准库实现。
-功能：GitHub 搜索 / 许可证识别 / GPL 律师审核 / 下载解压 / 环境自动检测 / 一键部署 / 环境打包带走 / 离线模式
+核心为 Python 3.8+ 标准库实现（零第三方硬依赖）；通用视频下载可选用 yt-dlp（pip install yt-dlp，GPL-3.0 兼容）。
+功能：GitHub 搜索 / 许可证识别 / GPL 律师审核 / 下载解压 / 环境自动检测 / 一键部署 / 环境打包带走 / 离线模式 / 通用视频下载
 启动：python server.py  →  浏览器打开 http://127.0.0.1:8787
 """
 import json, os, re, io, sys, time, zipfile, shutil, subprocess, threading, sqlite3, urllib.request, urllib.parse
+try:
+    import yt_dlp as _yt_dlp
+    YTDLP_AVAILABLE = True
+except Exception:
+    _yt_dlp = None
+    YTDLP_AVAILABLE = False
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 BASE = os.path.dirname(os.path.abspath(__file__))
@@ -2046,6 +2052,40 @@ def _stream_fetch(u, ddir, timeout=30, max_mb=300, prog=None):
         return fp, total, ctype
 
 
+def _dl_ytdlp(u, ddir, prog=None):
+    """通用下载：yt-dlp 解析（B站/微博/快手/YouTube 及 1000+ 站点）。失败抛错给引导。"""
+    if not YTDLP_AVAILABLE:
+        raise RuntimeError("yt-dlp 未安装。请在本机运行: python -m pip install yt-dlp，然后重启面板。")
+    import yt_dlp
+    def _hook(d):
+        if d.get("status") == "downloading":
+            total = d.get("total_bytes") or d.get("total_bytes_estimate") or 0
+            done = d.get("downloaded_bytes") or 0
+            if prog and total:
+                prog(done, total)
+    opts = {
+        "outtmpl": os.path.join(ddir, "%(title)s [%(id)s].%(ext)s"),
+        "noplaylist": True, "quiet": True, "no_warnings": True,
+        "progress_hooks": [_hook], "nocheckcertificate": True,
+        "socket_timeout": 30, "retries": 3, "concurrent_fragment_downloads": 8,
+        "ffmpeg_location": os.path.join(BASE, "bin", "ffmpeg", "bin"),
+    }
+    with yt_dlp.YoutubeDL(opts) as ydl:
+        info = ydl.extract_info(u, download=True)
+        fp = ""
+        if info:
+            reqs = info.get("requested_downloads") or []
+            if reqs:
+                fp = reqs[0].get("filepath") or ""
+            if not fp:
+                fp = ydl.prepare_filename(info)
+        if not fp or not os.path.exists(fp):
+            raise RuntimeError("yt-dlp 未生成文件（可能需登录、版权/地区限制，或站点接口变动）")
+    ext = os.path.splitext(fp)[1].lower()
+    ct = _PREVIEW_MIME.get(ext) or "application/octet-stream"
+    return fp, os.path.getsize(fp), ct, "yt-dlp 通用"
+
+
 def _dl_m3u8(u, ddir, timeout=15, prog=None):
     """HLS m3u8：解析分片清单 → 下载分片 → 拼接 .ts；prog(done, total)"""
     import urllib.request as _ur
@@ -2199,6 +2239,7 @@ def _dl_douyin(u, ddir, prog=None):
 
 def _dl_worker(task):
     ddir = task["dir"]
+    mode = task.get("mode", "auto")
     results = []
     for idx, u in enumerate(task["urls"]):
         task["cur"] = idx + 1
@@ -2207,7 +2248,9 @@ def _dl_worker(task):
         task["item_msg"] = "下载中…"
         try:
             host = urllib.parse.urlparse(u).netloc.lower()
-            if "bilibili.com" in host or "b23.tv" in host or "douyin.com" in host or "iesdouyin.com" in host:
+            if mode == "ytdlp":
+                fp, size, ct, kind = _dl_ytdlp(u, ddir, prog=lambda d, t: task.update(item_prog=(d, t)))
+            elif "bilibili.com" in host or "b23.tv" in host or "douyin.com" in host or "iesdouyin.com" in host:
                 fp, size, ct, kind = _dl_platform(u, ddir, prog=lambda d, t: task.update(item_prog=(d, t)))
             elif ".m3u8" in u.lower() or ".m3u" in u.lower():
                 fp, size, ct = _dl_m3u8(u, ddir, timeout=20,
@@ -2238,6 +2281,7 @@ def api_url_dl_start(params):
     urls = [str(u).strip() for u in urls if str(u).strip().startswith(("http://", "https://"))][:5]
     if not urls:
         return {"ok": False, "error": "请提供 http(s):// 的资源地址"}
+    mode = "ytdlp" if str(params.get("mode", "")).strip().lower() == "ytdlp" else "auto"
     ddir = os.path.join(WORKSPACES, "downloads", "videos")
     try:
         os.makedirs(ddir, exist_ok=True)
@@ -2248,7 +2292,8 @@ def api_url_dl_start(params):
         _DL_TID[0] += 1
         tid = "dl%d" % _DL_TID[0]
         task = {"id": tid, "dir": ddir, "urls": urls, "cur": 0, "total": len(urls),
-                "done": False, "results": [], "ok_count": 0, "item_prog": (0, 0), "item_url": "", "item_msg": "排队中"}
+                "done": False, "results": [], "ok_count": 0, "item_prog": (0, 0), "item_url": "", "item_msg": "排队中",
+                "mode": mode}
         _DL_TASKS[tid] = task
     threading.Thread(target=_dl_worker, args=(task,), daemon=True).start()
     return {"ok": True, "task_id": tid, "total": len(urls)}

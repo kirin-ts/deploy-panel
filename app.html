@@ -425,6 +425,7 @@ input:focus,textarea:focus{outline:none;border-color:var(--accent)}
             <div style="display:flex;gap:6px;margin-top:8px">
               <input id="ua-vurl" class="input" placeholder="粘贴任意 http(s):// 地址，如视频、图片、压缩包…" style="flex:1">
               <button class="btn btn-primary btn-sm" onclick="uaDlStart()">一键下载</button>
+              <button class="btn btn-sm" onclick="uaDlStart(true)" style="border-color:var(--accent);color:var(--accent)" title="用 yt-dlp 解析任意平台（B站/微博/快手/YouTube 等），需已安装 yt-dlp">通用(yt-dlp)</button>
             </div>
             <div id="ua-vlist" style="margin-top:6px;display:flex;flex-direction:column;gap:4px"></div>
             <div id="ua-prog" class="hidden" style="margin-top:8px;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 10px">
@@ -2209,7 +2210,7 @@ async function urlRun(){
   $("#ua-out-meta").textContent="退出码 "+r.exit+" · 产物已写入面板 workspaces/crawls/ 目录";
   $("#ua-out-area").classList.remove("hidden");
 }
-async function uaDlStart(){
+async function uaDlStart(ytdlp){
   const urls=[];
   const v=$("#ua-vurl").value.trim();
   if(v&&/^https?:\/\//i.test(v))urls.push(v);
@@ -2220,7 +2221,7 @@ async function uaDlStart(){
   $("#ua-prog-name").textContent=urls[0].slice(0,70);
   $("#ua-prog-pct").textContent="准备中…";
   $("#ua-prog-bar").style.width="0%";
-  const r=await apiPost("url/dl_start",{urls});
+  const r=await apiPost("url/dl_start",{urls, mode: ytdlp?"ytdlp":"auto"});
   if(!r.ok){$("#ua-prog").classList.add("hidden");toast(r.error);return;}
   window._uaPoll=setInterval(()=>uaPoll(r.task_id),400);
 }
