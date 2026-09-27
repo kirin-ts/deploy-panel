@@ -2921,7 +2921,7 @@ def api_url_dl_open(params):
     root = os.path.normpath(os.path.join(WORKSPACES, "downloads"))
     try:
         real = os.path.normpath(fp)
-        if not real.startswith(root):
+        if not os.path.normcase(real).startswith(os.path.normcase(root)):
             return {"ok": False, "error": "仅允许打开面板下载目录内的文件"}
         if os.path.isdir(real):
             os.startfile(real)
@@ -2945,7 +2945,7 @@ def api_url_dl_delete(params):
     deleted, failed = [], []
     for fp in paths:
         real = os.path.normpath(str(fp))
-        if not real.startswith(root):
+        if not os.path.normcase(real).startswith(os.path.normcase(root)):
             failed.append({"path": fp, "error": "不在下载目录内"})
             continue
         if real == root:
@@ -3169,7 +3169,7 @@ class Handler(BaseHTTPRequestHandler):
                 dl_root = os.path.normpath(os.path.join(WORKSPACES, "downloads"))
                 play_root = os.path.normpath(_PLAY_DIR)
                 real = os.path.normpath(fp)
-                if not (real.startswith(dl_root) or real.startswith(play_root)) or not os.path.isfile(real):
+                if not (os.path.normcase(real).startswith(os.path.normcase(dl_root)) or os.path.normcase(real).startswith(os.path.normcase(play_root))) or not os.path.isfile(real):
                     return self._send(404, b"not found", "text/plain; charset=utf-8")
                 ext = os.path.splitext(real)[1].lower()
                 ctype = _PREVIEW_MIME.get(ext, "application/octet-stream")

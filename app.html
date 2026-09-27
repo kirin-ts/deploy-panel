@@ -2363,7 +2363,7 @@ async function dlRefresh(){
   window._dlList=fs;
   let tot=0;fs.forEach(f=>tot+=f.size);
   $("#dl-stat").textContent=fs.length+" 个文件 · 共 "+fmtSize(tot);
-  if(!fs.length){$("#dl-files").innerHTML='<span style="color:var(--text2);font-size:12px">暂无下载文件</span>';return;}
+  if(!fs.length){$("#dl-files").innerHTML='<div style="color:var(--text2);font-size:12px;line-height:1.8">暂无下载文件<br><span style="color:var(--text3,#6e7681)">在「媒体中心」或「网址分析」下载的资源会出现在这里，可勾选批量删除、预览、定位</span></div>';dlSelChanged();return;}
   $("#dl-files").innerHTML=fs.map((f,i)=>{
     const rel=f.path.replace(/\\/g,"/");
     const t=new Date(f.mtime*1000).toLocaleString("zh-CN");
@@ -2417,11 +2417,12 @@ function dlSelChanged(){
 }
 async function dlDelSelected(){
   const paths=[...document.querySelectorAll(".dl-chk:checked")].map(c=>decodeURIComponent(c.dataset.path));
-  if(!paths.length)return;
+  if(!paths.length){toast("请先勾选要删除的文件（勾选左侧复选框）");return;}
   if(!confirm("确定删除选中的 "+paths.length+" 个文件？此操作不可恢复"))return;
   const r=await apiPost("url/dl_delete",{paths});
   if(!r.ok){toast(r.error||"删除失败");return;}
-  toast("已删除 "+r.deleted.length+" 个"+(r.failed.length?"，失败 "+r.failed.length+" 个":""));
+  if(r.failed&&r.failed.length) toast("已删除 "+r.deleted.length+" 个，失败 "+r.failed.length+" 个："+(r.failed[0].error||""));
+  else toast("已删除 "+r.deleted.length+" 个文件");
   $("#dl-all").checked=false;
   dlRefresh();
 }
