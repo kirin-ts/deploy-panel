@@ -2006,6 +2006,9 @@ def _web_engine_site(kw, site):
             out.append({"title": title[:120], "url": url, "summary": body_t})
     return out
 
+# 调试模式：存在 data/.nofilter 时跳过全部过滤（仅供查看搜索结果量，正式使用请删除该文件）
+_DEBUG_NOFILTER = os.path.exists(os.path.join(DATA, ".nofilter"))
+
 def _web_video_search(q, page=1):
     """全网视频搜索：多搜索引擎（Bing/百度/搜狗）并行抓取 → 融合去重 →
     按「视频平台域名 + 标题关键词」标记视频内容。仅公开网页，不采集个人隐私；
@@ -2029,23 +2032,25 @@ def _web_video_search(q, page=1):
     for it in raw:
         url = it["url"]
         low = url.lower()
-        if any(b in low for b in _WEB_BLACK_DOM):
-            continue
-        if any(k in it["title"] for k in _WEB_BLACK_TITLE):
-            continue
+        if not _DEBUG_NOFILTER:
+            if any(b in low for b in _WEB_BLACK_DOM):
+                continue
+            if any(k in it["title"] for k in _WEB_BLACK_TITLE):
+                continue
         key = url.split("&")[0]
         if key in seen:
             continue
         seen.add(key)
         dom = (urllib.parse.urlparse(url).netloc or "").replace("www.", "")
         title_low = it["title"].lower()
-        if any(d in low for d in _WEB_PAID_DOMS):
-            continue  # 付费/会员平台直接过滤，仅保留免费公开内容
-        if any(k in it["title"] for k in _WEB_JUNK_TITLE):
-            continue  # 解说/速看/小说/书评等非正片内容过滤
-        if not any(d in low for d in _WEB_VIDEO_DOMS):
-            continue  # 非免费视频平台域名过滤（不再按标题词判定，杜绝小说/解说/官网混入）
-        lv = 2
+        if not _DEBUG_NOFILTER:
+            if any(d in low for d in _WEB_PAID_DOMS):
+                continue  # 付费/会员平台直接过滤，仅保留免费公开内容
+            if any(k in it["title"] for k in _WEB_JUNK_TITLE):
+                continue  # 解说/速看/小说/书评等非正片内容过滤
+            if not any(d in low for d in _WEB_VIDEO_DOMS):
+                continue  # 非免费视频平台域名过滤（不再按标题词判定，杜绝小说/解说/官网混入）
+        lv = 2 if _DEBUG_NOFILTER else 2
         items.append({"title": it["title"][:120], "url": url, "domain": dom[:40],
                       "summary": it["summary"][:160],
                       "hint": True, "level": lv,
