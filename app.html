@@ -475,6 +475,7 @@ input:focus,textarea:focus{outline:none;border-color:var(--accent)}
           <button class="btn btn-sm mt-tab-btn" data-tab="book" onclick="mtTab('book',this)">漫画 / 小说</button>
           <span style="flex:1"></span>
           <span style="font-size:11px;color:var(--text2)">仅公开/免费内容 · 付费会员内容不索引</span>
+          <button id="ua-filter-btn" class="btn btn-ghost btn-sm" onclick="uaToggleFilter()" style="font-size:11px;margin-left:6px" title="内容过滤开关：开=只显示免费公开视频；关=调试模式显示全部搜索结果">过滤：…</button>
         </div>
         <div id="mt-panel-video">
         <div class="ua-card">
@@ -1271,6 +1272,7 @@ async function packFromInput(){
 /* 设置 */
 
 /* 初始化 */
+setTimeout(uaFilterState, 400);
 api("status").then(r=>{
   if(r.ok){
     $("#about-data").textContent=r.data_dir.replace(/\\\\/g,"/");
@@ -2569,6 +2571,31 @@ function mtTab(name,btn){
     b.style.color=on?"var(--accent)":"";
     b.style.background=on?"var(--accent11,#eaf1ff)":"";
   });
+}
+let _uaFilterOn = true;
+function uaFilterBtn(){
+  const b = document.getElementById("ua-filter-btn");
+  if (!b) return;
+  b.textContent = _uaFilterOn ? "过滤：开" : "过滤：关";
+  b.style.borderColor = _uaFilterOn ? "" : "#f59e0b";
+  b.style.color = _uaFilterOn ? "" : "#f59e0b";
+  b.style.background = _uaFilterOn ? "" : "#fff8e6";
+}
+async function uaFilterState(){
+  try {
+    const r = await apiPost("media/nofilter", {});
+    if (r && "on" in r) { _uaFilterOn = !!r.on; uaFilterBtn(); }
+  } catch(e) {}
+}
+async function uaToggleFilter(){
+  try {
+    const r = await apiPost("media/nofilter", {on: !_uaFilterOn});
+    if (r && "on" in r) {
+      _uaFilterOn = !!r.on; uaFilterBtn();
+      uaToast(_uaFilterOn ? "已开启内容过滤：只显示免费公开视频" : "已关闭内容过滤（调试模式）：显示全部搜索结果，付费内容无法播放");
+      if (window.uaVSearch) uaVSearch();
+    }
+  } catch(e) { uaToast("切换失败：" + (e && e.message || e)); }
 }
 async function uaVSearch(){
   const q=$("#ua-vq").value.trim();
