@@ -2630,6 +2630,21 @@ def api_url_check(params):
     return {"ok": True, **sec}
 
 
+def _looks_like_html(data):
+    """下载产物若为网页（错误页/验证页/登录页）则不是有效资源，判失败。
+    兼容服务器强制 gzip 压缩的 HTML（未请求压缩也返回 gzip 的情况）。"""
+    import gzip as _gz
+    raw = data[:16384]
+    if raw[:2] == b"\x1f\x8b":
+        try:
+            raw = _gz.decompress(raw)
+        except Exception:
+            return True  # gzip 数据无法解压出文件流，视为可疑网页
+    head = (raw or b"").lstrip().lower()
+    return head.startswith(b"<!doctype html") or head.startswith(b"<html") or head.startswith(b"<head") \
+        or b"<html" in head[:512] or b"<!doctype" in head[:512]
+
+
 def _pick_filename(resp, url, idx):
     cd = resp.headers.get("Content-Disposition", "")
     m = re.search(r"filename\*?=(?:UTF-8\'')?\"?([^\"\r\n;]+)\"?", cd, re.I)
@@ -2672,6 +2687,9 @@ def _download_one(u, ddir):
                 data = resp.read(10 * 1024 * 1024 + 1)
                 if len(data) > 10 * 1024 * 1024:
                     last_err = "资源超过 10MB，已停止"
+                    continue
+                if _looks_like_html(data):
+                    last_err = "目标返回网页而非文件（可能需登录/会员或链接失效）"
                     continue
                 fn = _pick_filename(resp, u, i)
                 fp = os.path.join(ddir, fn)
@@ -2737,10 +2755,17 @@ def _stream_fetch(u, ddir, timeout=30, max_mb=300, prog=None):
         except Exception:
             clen = 0
         with open(fp, "wb") as f:
+            first = True
             while True:
                 chunk = resp.read(65536)
                 if not chunk:
                     break
+                if first:
+                    if _looks_like_html(chunk):
+                        f.close()
+                        os.remove(fp)
+                        raise RuntimeError("目标返回网页而非文件（可能需登录/会员或链接失效）")
+                    first = False
                 total += len(chunk)
                 if total > max_mb * 1024 * 1024:
                     f.close()
@@ -3178,6 +3203,45 @@ def api_url_play_clean(params):
         return {"ok": False, "error": str(e)[:120]}
 
 
+def api_url_play_gc(params):
+    """全局播放缓存回收：删除已完成任务/闲置 30 分钟以上/无活跃任务持有的临时文件，
+    并清理已结束的任务记录。返回释放量与文件数。"""
+    import glob as _glob
+    with _PLAY_LOCK:
+        held = set()
+        for tid, t in _PLAY_TASKS.items():
+            if not t.get("done") and t.get("path"):
+                held.add(os.path.normpath(t["path"]))
+        if not os.path.isdir(_PLAY_DIR):
+            return {"ok": True, "removed": 0, "freed_mb": 0, "tasks_cleared": 0}
+        removed, freed = [], 0
+        for fp in _glob.glob(os.path.join(_PLAY_DIR, "*")):
+            real = os.path.normpath(fp)
+            if real in held:
+                continue
+            try:
+                age = time.time() - os.path.getmtime(fp)
+            except Exception:
+                age = 0
+            if age > 1800 or not os.path.isfile(fp):
+                try:
+                    freed += os.path.getsize(fp)
+                    os.remove(fp)
+                    removed.append(os.path.basename(fp))
+                except Exception:
+                    pass
+        done_ids = [tid for tid, t in _PLAY_TASKS.items() if t.get("done")]
+        for tid in done_ids:
+            _PLAY_TASKS.pop(tid, None)
+    try:
+        with _PLAY_CACHE_LOCK:
+            _PLAY_CACHE.clear()
+    except Exception:
+        pass
+    return {"ok": True, "removed": len(removed), "freed_mb": round(freed / 1048576, 1),
+            "tasks_cleared": len(done_ids)}
+
+
 def _dl_worker(task):
     ddir = task["dir"]
     mode = task.get("mode", "auto")
@@ -3571,6 +3635,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(200, json.dumps(api_url_play_progress(params), ensure_ascii=False).encode("utf-8"))
             if parsed.path == "/api/url/play_clean":
                 return self._send(200, json.dumps(api_url_play_clean(params), ensure_ascii=False).encode("utf-8"))
+            if parsed.path == "/api/url/play_gc":
+                return self._send(200, json.dumps(api_url_play_gc(params), ensure_ascii=False).encode("utf-8"))
             if parsed.path == "/api/url/playinfo":
                 return self._send(200, json.dumps(api_url_playinfo(params), ensure_ascii=False).encode("utf-8"))
             if parsed.path == "/api/url/play":
@@ -3825,6 +3891,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(200, json.dumps(api_url_dl_open(body), ensure_ascii=False).encode("utf-8"))
             if parsed.path == "/api/url/dl_delete":
                 return self._send(200, json.dumps(api_url_dl_delete(body), ensure_ascii=False).encode("utf-8"))
+            if parsed.path == "/api/url/play_gc":
+                return self._send(200, json.dumps(api_url_play_gc(params), ensure_ascii=False).encode("utf-8"))
         except Exception as e:
             log("handler post error: " + repr(e))
             return self._send(500, json.dumps({"ok": False, "error": str(e)}).encode("utf-8"))

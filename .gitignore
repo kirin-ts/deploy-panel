@@ -31,3 +31,6 @@ _app_module*.txt
 _reinject*.py
 
 _fix_*.py
+
+# 临时/测试脚本（防误提交）
+_[a-z_]*\.py
