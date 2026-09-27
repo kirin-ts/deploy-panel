@@ -2442,6 +2442,65 @@ def _dl_douyin(u, ddir, prog=None):
     raise RuntimeError("抖音接口未开放（未登录/风控加密，ID %s）。已尝试公开接口失败：%s。请用以下任一方式：① 抖音 App/网页点「保存到相册」；② 浏览器打开该视频 → F12 → Network → 筛选 media 类型复制 .mp4 地址，粘贴到本面板「一键下载」。面板不做接口对抗。" % (vid, last_err))
 
 
+_PLAY_DIR = os.path.join(DATA, "tmp_play")
+os.makedirs(_PLAY_DIR, exist_ok=True)
+_PLAY_TASKS = {}
+_PLAY_LOCK = threading.Lock()
+_PLAY_TID = [0]
+
+
+def _play_worker(task):
+    """临时文件播放：yt-dlp 完整拉取到临时目录（不写下载日志/列表）。"""
+    u = task["url"]
+    try:
+        fp, size, ct, kind = _dl_ytdlp(u, task["dir"], prog=lambda d, t: task.update(pct=int(d * 100 / t) if t else 0))
+        task.update(done=True, path=fp, size=size, pct=100)
+    except Exception as e:
+        task.update(done=True, error=str(e)[:200])
+
+
+def api_url_play_prep(params):
+    """POST {url} → 启动临时播放准备任务（完整拉取到 data/tmp_play）"""
+    u = str(params.get("url") or "").strip()
+    if not u.startswith(("http://", "https://")):
+        return {"ok": False, "error": "请提供 http(s):// 链接"}
+    with _PLAY_LOCK:
+        _PLAY_TID[0] += 1
+        tid = "pl%d" % _PLAY_TID[0]
+        task = {"id": tid, "url": u, "dir": _PLAY_DIR, "done": False, "pct": 0,
+                "path": "", "size": 0, "error": ""}
+        _PLAY_TASKS[tid] = task
+    threading.Thread(target=_play_worker, args=(task,), daemon=True).start()
+    return {"ok": True, "task_id": tid}
+
+
+def api_url_play_progress(params):
+    tid = str(params.get("task_id", ""))
+    with _PLAY_LOCK:
+        t = _PLAY_TASKS.get(tid)
+        if not t:
+            return {"ok": False, "error": "任务不存在或已过期"}
+        r = dict(t)
+    return {"ok": True, "task_id": tid, "done": r.get("done"), "pct": r.get("pct"),
+            "path": r.get("path", ""), "size": r.get("size", 0), "error": r.get("error", "")}
+
+
+def api_url_play_clean(params):
+    """GET path=… → 删除播放临时文件（仅限 data/tmp_play 内）"""
+    fp = str(params.get("path") or "").strip()
+    if not fp:
+        return {"ok": False, "error": "缺少 path"}
+    root = os.path.normpath(_PLAY_DIR)
+    real = os.path.normpath(fp)
+    if not real.startswith(root) or not os.path.isfile(real):
+        return {"ok": False, "error": "仅允许清理播放临时文件"}
+    try:
+        os.remove(real)
+        return {"ok": True, "removed": os.path.basename(real)}
+    except Exception as e:
+        return {"ok": False, "error": str(e)[:120]}
+
+
 def _dl_worker(task):
     ddir = task["dir"]
     mode = task.get("mode", "auto")
@@ -2807,6 +2866,10 @@ class Handler(BaseHTTPRequestHandler):
                     return self._send(200, f.read(), "text/html; charset=utf-8")
             if parsed.path == "/api/video/search":
                 return self._send(200, json.dumps(api_video_search(params), ensure_ascii=False).encode("utf-8"))
+            if parsed.path == "/api/url/play_progress":
+                return self._send(200, json.dumps(api_url_play_progress(params), ensure_ascii=False).encode("utf-8"))
+            if parsed.path == "/api/url/play_clean":
+                return self._send(200, json.dumps(api_url_play_clean(params), ensure_ascii=False).encode("utf-8"))
             if parsed.path == "/api/url/playinfo":
                 return self._send(200, json.dumps(api_url_playinfo(params), ensure_ascii=False).encode("utf-8"))
             if parsed.path == "/api/url/play":
@@ -2823,9 +2886,10 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(200, json.dumps(api_url_dl_files(params), ensure_ascii=False).encode("utf-8"))
             if parsed.path == "/api/url/preview":
                 fp = params.get("path", "")
-                root = os.path.normpath(os.path.join(WORKSPACES, "downloads"))
+                dl_root = os.path.normpath(os.path.join(WORKSPACES, "downloads"))
+                play_root = os.path.normpath(_PLAY_DIR)
                 real = os.path.normpath(fp)
-                if not real.startswith(root) or not os.path.isfile(real):
+                if not (real.startswith(dl_root) or real.startswith(play_root)) or not os.path.isfile(real):
                     return self._send(404, b"not found", "text/plain; charset=utf-8")
                 ext = os.path.splitext(real)[1].lower()
                 ctype = _PREVIEW_MIME.get(ext, "application/octet-stream")
@@ -2993,6 +3057,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(200, json.dumps(api_url_download(body), ensure_ascii=False).encode("utf-8"))
             if parsed.path == "/api/url/dl_video":
                 return self._send(200, json.dumps(api_url_dl_video(body), ensure_ascii=False).encode("utf-8"))
+            if parsed.path == "/api/url/play_prep":
+                return self._send(200, json.dumps(api_url_play_prep(body), ensure_ascii=False).encode("utf-8"))
             if parsed.path == "/api/url/dl_start":
                 return self._send(200, json.dumps(api_url_dl_start(body), ensure_ascii=False).encode("utf-8"))
             if parsed.path == "/api/url/dl_open":

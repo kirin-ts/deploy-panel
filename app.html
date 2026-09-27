@@ -2378,18 +2378,49 @@ async function uaPlay(){
   const v=$("#ua-vurl").value.trim();
   if(!/^https?:\/\//i.test(v)){toast("请粘贴 http(s):// 视频链接");return;}
   if(window._uaSecLevel==="danger"){toast("危险站点已禁止");return;}
-  toast("正在提取直链…（约 5-15 秒）");
-  const r=await api("url/playinfo",{url:v});
-  if(!r.ok){toast(r.error||"解析失败");return;}
-  $("#ua-play-title").textContent=r.title+(r.height?(" · "+r.height+"p"):"");
-  $("#ua-play-video").src="api/url/play?url="+encodeURIComponent(r.url)+(r.aurl?("&a="+encodeURIComponent(r.aurl)):"")+"&ref="+encodeURIComponent(v);
+  uaPlayPrep(v,"");
+}
+async function uaPlayPrep(u,title){
+  $("#ua-play-title").textContent=title||"准备播放…";
+  $("#ua-play-video").style.display="none";
+  $("#ua-play-prog").style.display="flex";
+  $("#ua-play-prog-bar").style.width="0%";
+  $("#ua-play-prog-txt").textContent="准备中…";
   $("#ua-play-mask").classList.remove("hidden");
-  const pv=$("#ua-play-video");
-  pv.play().catch(()=>{});
+  toast("正在准备播放（完整拉取，不保留文件）…");
+  const r=await apiPost("url/play_prep",{url:u});
+  if(!r.ok){uaPlayClose();toast(r.error||"准备失败");return;}
+  const tid=r.task_id;
+  window._uaPlayTid=tid;
+  const t0=Date.now();
+  const iv=setInterval(async()=>{
+    const p=await api("url/play_progress",{task_id:tid});
+    if(!p.ok){clearInterval(iv);uaPlayClose();toast(p.error||"任务异常");return;}
+    if(p.done){
+      clearInterval(iv);
+      if(p.error){uaPlayClose();toast(p.error||"该内容无法准备播放（可能需登录或会员）");return;}
+      window._uaPlayTmp=p.path;
+      const v=$("#ua-play-video");
+      v.src="api/url/preview?path="+encodeURIComponent(p.path);
+      v.style.display="";
+      $("#ua-play-prog").style.display="none";
+      v.play().catch(()=>{});
+      return;
+    }
+    const w=Math.max(4,p.pct||0);
+    $("#ua-play-prog-bar").style.width=w+"%";
+    $("#ua-play-prog-txt").textContent=(p.pct>0?p.pct:Math.max(1,Math.floor((Date.now()-t0)/1000)))+"%";
+  },600);
 }
 function uaPlayClose(){
   const pv=$("#ua-play-video"); pv.pause(); pv.removeAttribute("src"); pv.load();
+  pv.style.display="none";
+  $("#ua-play-prog").style.display="none";
   $("#ua-play-mask").classList.add("hidden");
+  const tmp=window._uaPlayTmp;
+  window._uaPlayTmp=null;
+  window._uaPlayTid=null;
+  if(tmp){api("url/play_clean",{path:tmp}).then(()=>{});}
 }
 
 
@@ -2415,14 +2446,7 @@ function uaVQ(t){$("#ua-vq").value=t;uaVSearch();}
 function uaVPlay(i){
   const it=(window._uaVItems||[])[i]; if(!it)return;
   if(window._uaSecLevel==="danger"){toast("危险站点已禁止");return;}
-  toast("提取直链中…（约 5-15 秒）");
-  api("url/playinfo",{url:it.url}).then(r=>{
-    if(!r.ok){toast(r.error||"该内容暂不支持直接播放（可能需登录或会员）");return;}
-    $("#ua-play-title").textContent=r.title+(r.height?(" · "+r.height+"p"):"");
-    $("#ua-play-video").src="api/url/play?url="+encodeURIComponent(r.url)+(r.aurl?("&a="+encodeURIComponent(r.aurl)):"")+"&ref="+encodeURIComponent(it.url);
-    $("#ua-play-mask").classList.remove("hidden");
-    $("#ua-play-video").play().catch(()=>{});
-  });
+  uaPlayPrep(it.url,it.title);
 }
 function uaVDl(i){
   const it=(window._uaVItems||[])[i]; if(!it)return;
@@ -2447,8 +2471,12 @@ function uaDlStartWith(u){
     <span id="ua-play-title" style="word-break:break-all;max-width:80%"></span>
     <button class="btn btn-sm" onclick="uaPlayClose()" style="border-color:#fff6;color:#fff">关闭</button>
   </div>
-  <video id="ua-play-video" controls autoplay style="width:min(94vw,1080px);max-height:78vh;background:#000;border-radius:8px"></video>
-  <div style="color:#fff8;font-size:12px">公开视频直接播放 · 无广告/弹窗 · 不产生文件 · VIP/会员内容不支持</div>
+  <video id="ua-play-video" controls autoplay style="width:min(94vw,1080px);max-height:78vh;background:#000;border-radius:8px;display:none"></video>
+  <div id="ua-play-prog" style="width:min(94vw,1080px);display:flex;align-items:center;gap:8px">
+    <div style="flex:1;height:8px;background:#ffffff1a;border-radius:4px;overflow:hidden"><div id="ua-play-prog-bar" style="height:100%;width:0%;background:#4fd08a;transition:width .3s"></div></div>
+    <span id="ua-play-prog-txt" style="color:#fff;font-size:13px;min-width:60px">准备中…</span>
+  </div>
+  <div style="color:#fff8;font-size:12px">公开视频直接播放 · 无广告/弹窗 · 播放结束自动清理，不保留文件 · VIP/会员内容不支持</div>
 </div>
 </body>
 </html>
