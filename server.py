@@ -1777,15 +1777,48 @@ def api_url_playinfo(params):
 
 
 def api_url_play(self, params):
-    """GET /api/url/play?url=<直链>&ref=<来源页> —— 后端带 UA/Referer 流式转发（支持 Range）"""
+    """GET /api/url/play?url=<直链>&a=<音频流>&ref=<来源页>
+    分离流用 ffmpeg 实时合并成 fMP4 流式转发；单流直接代理（支持 Range）。"""
     u = str(params.get("url") or "").strip()
+    a = str(params.get("a") or "").strip()
     ref = str(params.get("ref") or "").strip()
     if not u.startswith(("http://", "https://")):
         self._send(400, "text/plain; charset=utf-8", "bad url"); return
-    hd = {"User-Agent": _DL_UA_POOL[0] if isinstance(_DL_UA_POOL, list) and _DL_UA_POOL else "Mozilla/5.0",
-          "Accept": "*/*"}
+    ua = _DL_UA_POOL[0] if isinstance(_DL_UA_POOL, list) and _DL_UA_POOL else "Mozilla/5.0"
+    hd = {"User-Agent": ua, "Accept": "*/*"}
     if ref.startswith(("http://", "https://")):
         hd["Referer"] = ref
+    # 分离流：ffmpeg 合并
+    if a and a.startswith(("http://", "https://")):
+        ff = os.path.join(BASE, "bin", "ffmpeg", "bin", "ffmpeg.exe")
+        if os.path.exists(ff):
+            try:
+                hdrs = "User-Agent: %s\r\nReferer: %s\r\nAccept: */*\r\n" % (ua, ref or "https://www.bilibili.com/")
+                proc = subprocess.Popen(
+                    [ff, "-headers", hdrs, "-i", u, "-headers", hdrs, "-i", a,
+                     "-c", "copy", "-movflags", "frag_keyframe+empty_moov",
+                     "-f", "mp4", "pipe:1"],
+                    stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, bufsize=0)
+                self.send_response(200)
+                self.send_header("Content-Type", "video/mp4")
+                self.send_header("Accept-Ranges", "none")
+                self.send_header("Access-Control-Allow-Origin", "*")
+                self.end_headers()
+                while True:
+                    blk = proc.stdout.read(64 * 1024)
+                    if not blk:
+                        break
+                    try:
+                        self.wfile.write(blk)
+                    except Exception:
+                        break
+                try:
+                    proc.terminate()
+                except Exception:
+                    pass
+                return
+            except Exception:
+                pass
     rng = self.headers.get("Range")
     try:
         req = urllib.request.Request(u, headers=hd)
@@ -2170,7 +2203,9 @@ def _stream_fetch(u, ddir, timeout=30, max_mb=300, prog=None):
 
 
 def _yt_playinfo(u):
-    """yt-dlp 提取直链（不下载文件）。返回 dict(title, url, ext, height)；仅供公开视频直接播放。"""
+    """yt-dlp 提取直链（不下载文件）。返回 dict(title, url, aurl, ext, height)；
+    分离流（B站高清）返回视频流 url + 音频流 aurl，播放时由后端 ffmpeg 实时合并。
+    仅供公开视频直接播放。"""
     if not YTDLP_AVAILABLE:
         raise RuntimeError("yt-dlp 未安装。请运行: python -m pip install yt-dlp 后重启面板。")
     import yt_dlp
@@ -2182,7 +2217,7 @@ def _yt_playinfo(u):
         raise RuntimeError("未能解析该链接（可能需登录、版权/地区限制）")
     title = info.get("title") or info.get("id") or "视频"
     fmts = info.get("formats") or []
-    pick = None
+    vpick = None
     for f in fmts:
         proto = f.get("protocol") or ""
         ext = f.get("ext") or ""
@@ -2193,14 +2228,33 @@ def _yt_playinfo(u):
             continue
         if not vc or vc == "none":
             continue
-        if pick is None or (f.get("height") or 0) > (pick.get("height") or 0):
-            pick = f
-    if pick is None and info.get("url"):
-        pick = {"url": info["url"], "ext": info.get("ext") or "", "height": None}
-    if not pick or not pick.get("url"):
-        raise RuntimeError("未找到可直接播放的直链（可能需要登录或会员）")
-    return {"title": title, "url": pick["url"], "ext": pick.get("ext") or "",
-            "height": pick.get("height") or 0}
+        # 视频流：选最高清
+        if vpick is None or (f.get("height") or 0) > (vpick.get("height") or 0):
+            vpick = f
+    # 音频流：acodec 非 none，优选 aac/m4a
+    apick = None
+    for f in fmts:
+        ac = f.get("acodec")
+        if not ac or ac == "none":
+            continue
+        if f.get("vcodec") and f.get("vcodec") != "none":
+            continue  # 只要纯音频流
+        proto = f.get("protocol") or ""
+        if "m3u8" in proto:
+            continue
+        if apick is None:
+            apick = f
+    vurl = None
+    if vpick and vpick.get("url"):
+        vurl = vpick["url"]
+    elif info.get("url"):
+        vurl = info["url"]
+    if not vurl:
+        raise RuntimeError("未找到可播放的视频直链（可能需要登录或会员）")
+    aurl = apick.get("url") if apick and apick.get("url") else ""
+    return {"title": title, "url": vurl, "aurl": aurl,
+            "ext": (vpick.get("ext") if vpick else (info.get("ext") or "")) or "",
+            "height": (vpick.get("height") if vpick else 0) or 0}
 
 
 def _dl_ytdlp(u, ddir, prog=None):

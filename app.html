@@ -2382,7 +2382,7 @@ async function uaPlay(){
   const r=await api("url/playinfo",{url:v});
   if(!r.ok){toast(r.error||"解析失败");return;}
   $("#ua-play-title").textContent=r.title+(r.height?(" · "+r.height+"p"):"");
-  $("#ua-play-video").src="api/url/play?url="+encodeURIComponent(r.url)+"&ref="+encodeURIComponent(v);
+  $("#ua-play-video").src="api/url/play?url="+encodeURIComponent(r.url)+(r.aurl?("&a="+encodeURIComponent(r.aurl)):"")+"&ref="+encodeURIComponent(v);
   $("#ua-play-mask").classList.remove("hidden");
   const pv=$("#ua-play-video");
   pv.play().catch(()=>{});
@@ -2419,7 +2419,7 @@ function uaVPlay(i){
   api("url/playinfo",{url:it.url}).then(r=>{
     if(!r.ok){toast(r.error||"该内容暂不支持直接播放（可能需登录或会员）");return;}
     $("#ua-play-title").textContent=r.title+(r.height?(" · "+r.height+"p"):"");
-    $("#ua-play-video").src="api/url/play?url="+encodeURIComponent(r.url)+"&ref="+encodeURIComponent(it.url);
+    $("#ua-play-video").src="api/url/play?url="+encodeURIComponent(r.url)+(r.aurl?("&a="+encodeURIComponent(r.aurl)):"")+"&ref="+encodeURIComponent(it.url);
     $("#ua-play-mask").classList.remove("hidden");
     $("#ua-play-video").play().catch(()=>{});
   });
