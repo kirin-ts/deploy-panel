@@ -1982,6 +1982,33 @@ def _web_engine_360(q):
             out.append({"title": title[:120], "url": url, "summary": ""})
     return out
 
+_WEB_FREE_SITES = ("tv.cctv.com", "jishi.cctv.com", "bilibili.com", "1905.com",
+                  "open.163.com", "icourse163.org", "ixigua.com", "v.douyin.com",
+                  "v.kuaishou.com", "pearvideo.com", "tv.cctv.com/videos")
+
+def _web_engine_site(kw, site):
+    """站内定向搜索：site:免费平台 关键词（提高免费正片召回）"""
+    q = urllib.parse.quote(kw)
+    u = "https://cn.bing.com/search?q=site%%3A%s+%s&count=12" % (site, q)
+    hd = {"User-Agent": (_DL_UA_POOL[0] if isinstance(_DL_UA_POOL, list) and _DL_UA_POOL else "Mozilla/5.0"),
+          "Accept-Language": "zh-CN,zh;q=0.9", "Accept-Encoding": "identity"}
+    try:
+        status, body = http_get(u, timeout=12, headers=hd)
+    except Exception:
+        return []
+    if status != 200:
+        return []
+    html = body.decode("utf-8", "ignore")
+    out = []
+    for m in re.finditer(r'<li class="b_algo".*?<h2[^>]*><a[^>]*href="([^"]+)"[^>]*>(.*?)</a></h2>(.*?)</li>', html, re.S):
+        url = m.group(1).strip()
+        title = re.sub(r"<[^>]+>", "", m.group(2)).strip()
+        body_t = re.sub(r"<[^>]+>", " ", m.group(3))
+        body_t = re.sub(r"\s+", " ", body_t).strip()[:160]
+        if url.startswith("http") and title:
+            out.append({"title": title[:120], "url": url, "summary": body_t})
+    return out
+
 def _web_video_search(q, page=1):
     """全网视频搜索：多搜索引擎（Bing/百度/搜狗）并行抓取 → 融合去重 →
     按「视频平台域名 + 标题关键词」标记视频内容。仅公开网页，不采集个人隐私；
@@ -1993,6 +2020,11 @@ def _web_video_search(q, page=1):
     for eng in (_web_engine_bing, _web_engine_baidu, _web_engine_sogou, _web_engine_360):
         try:
             raw += eng(kw)
+        except Exception:
+            pass
+    for site in _WEB_FREE_SITES:
+        try:
+            raw += _web_engine_site(kw, site)
         except Exception:
             pass
     # 融合去重（按 URL，百度跳转链接去 query 尾参后再去重）
