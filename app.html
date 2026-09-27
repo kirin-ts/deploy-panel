@@ -2505,35 +2505,9 @@ async function uaPlayPrep(u,title){
   const tid=r.task_id;
   window._uaPlayTid=tid;
   window._uaPlayTmp=r.path||"";
-  // 立即用临时路径播放（后端 preview 会等待未下载部分，边下边播）
   const v=$("#ua-play-video");
-  if(window._uaPlayTmp){
-    v.style.display="";
-    v.muted=true;
-    if(!window._uaPlayReloadBound){
-      window._uaPlayReloadBound=true;
-      // 边下边播：播放器在"已下载末尾"结束/卡缓冲时，重新加载从当前位置续播（带防抖）
-      const uaPlayReload=()=>{
-        if(window._uaPlayDone||!window._uaPlayTid)return;
-        const now=Date.now();
-        if(window._uaPlayLastReload&&now-window._uaPlayLastReload<2500)return;
-        window._uaPlayLastReload=now;
-        const t=v.currentTime;
-        // 重新加载（数据已更多），等元数据就绪后再跳回当前位置续播
-        v.load();
-        const _onMeta=()=>{
-          v.removeEventListener("loadedmetadata",_onMeta);
-          try{ if(t>0){v.currentTime=Math.min(t,(v.duration||t));} }catch(e){}
-          v.play().catch(()=>{});
-        };
-        v.addEventListener("loadedmetadata",_onMeta);
-      };
-      v.addEventListener("ended",uaPlayReload);
-      v.addEventListener("stalled",uaPlayReload);
-      v.addEventListener("waiting",uaPlayReload);
-    }
-  }
-  const t0=Date.now();
+  // 方案：完整转封装（含断流重连+时长校验）完成后才播放，期间显示实时进度。
+  // 不再边下边播——转封装未完成时用 preview 流式读"已写入位置"会被播放器当成文件结尾，导致只播开头几秒。
   const iv=setInterval(async()=>{
     const p=await api("url/play_progress",{task_id:tid});
     if(!p.ok){clearInterval(iv);uaPlayClose();toast(p.error||"任务异常");return;}
@@ -2543,18 +2517,14 @@ async function uaPlayPrep(u,title){
       window._uaPlayDone=true;
       window._uaPlayTmp=p.path;
       $("#ua-play-prog").style.display="none";
-      if(!v.src){v.src="api/url/preview?path="+encodeURIComponent(p.path);v.style.display="";v.play().catch(()=>{});}
-      else if(v.readyState<2){v.load();v.play().catch(()=>{});}  // 下载中已尝试播放但未就绪：重载完整文件
+      v.src="api/url/preview?path="+encodeURIComponent(p.path);
+      v.style.display="";
+      v.play().catch(()=>{});
       return;
     }
     const mb=(p.bytes_done||0)/1048576;
     $("#ua-play-prog-bar").style.width=Math.max(4,Math.min(100,(p.pct>0?p.pct:4)))+"%";
-    $("#ua-play-prog-txt").textContent=(mb>0?"正在加载视频 "+mb.toFixed(1)+" MB":"正在解析视频地址（最多约20秒）");
-    // 文件有数据后再给播放器 src，避免 0 字节/未创建时请求失败
-    if(!v.src&&window._uaPlayTmp&&(p.bytes_done>0||p.done)){
-      v.src="api/url/preview?path="+encodeURIComponent(window._uaPlayTmp);
-      v.play().catch(()=>{});
-    }
+    $("#ua-play-prog-txt").textContent="正在转码视频 "+mb.toFixed(1)+" MB"+(p.size?" / "+((p.size||0)/1048576).toFixed(1)+" MB":"")+"（完整拉流+转码中，完成后自动播放）";
   },700);
 }
 function uaPlayClose(){
