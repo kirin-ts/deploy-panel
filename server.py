@@ -1793,7 +1793,9 @@ def api_media_episodes(params):
                     dur = int(dur) // 1000
                 except Exception:
                     dur = 0
-                dur_txt = (str(dur // 60) + ":" + str(dur % 60).zfill(2)) if dur else ""
+                # B站 pgc 接口部分集 duration 为异常毫秒值（如 16000=16秒），
+                # 真实剧集不可能这么短，标注 -- 避免与下载后实际时长对不上
+                dur_txt = (str(dur // 60) + ":" + str(dur % 60).zfill(2)) if dur >= 60 else "--"
                 eps.append({"index": e.get("title") or str(epid), "title": e.get("long_title") or e.get("title") or "",
                             "dur": dur_txt, "url": ("https://www.bilibili.com/bangumi/play/ep" + str(epid)) if epid else ""})
         elif kind == "video":

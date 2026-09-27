@@ -2589,7 +2589,7 @@ async function uaVEps(i){
     const sid=(it.url||"").match(/bangumi\/play\/ss(\d+)/);
     r=await apiPost("media/episodes",{kind:"bangumi",season_id:sid?sid[1]:""});
   } else {
-    const bv=(it.url||"").match(/video\/(BV[0-9A-Za-z]+)/);
+    const bv=(it.url||"").match(/video\/(BV[0-9A-Za-z]+|av\d+)/);
     r=await apiPost("media/episodes",{kind:"video",bvid:bv?bv[1]:""});
   }
   if(!r.ok){box.innerHTML='<span style="color:#e07b7b;font-size:12px">'+(r.error||"获取失败")+'</span>';return;}
