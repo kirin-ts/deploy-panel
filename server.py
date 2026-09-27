@@ -1884,47 +1884,116 @@ _WEB_BLACK_DOM = ("baike.baidu", "zdic.net", "hanyuguoxue", "chinesewords.org", 
                     "wenku.baidu", "cqvip", "wanfangdata", "dict.", "cnki",
                     "jzvideo", "baiduvideo", "yingyuan", "qingse", "vod", "ppzy",
                     "zuidazy", "maoyun", "kandian", "m3u8",
-                    "jjwxc", "qidian", "zhulang", "huayue", "biquge")
+                    "jjwxc", "qidian", "zhulang", "huayue", "biquge",
+                    "weread", "fanqienovel", "fanqie", "qingting", "ximalaya")
 _WEB_BLACK_TITLE = ("免费观看", "免费追剧", "高清影视", "影视大全", "在线影院", "免费影院",
                     "影视资源", "海量片库", "蓝光画质", "电影天堂", "站长", "APP下载",
                     "在线播放", "网盘资源")
-_WEB_VIDEO_HINT = (".mp4", ".webm", ".m3u8", "video/", "v.qq.com", "bilibili", "douyin",
-                   "ixigua", "youku", "iqiyi", "mgtv", "sohu", "163.com", "youtube",
-                   "vimeo", "dailymotion", "kuaishou", "weibo.com/tv", "le.com",
-                   "video.", "播放", "在线观看", "全集", "正片")
+# 视频平台域名白名单：命中即判定为视频平台页（解析播放成功率更高）
+_WEB_VIDEO_DOMS = ("bilibili.com", "douyin.com", "ixigua.com", "youku.com", "iqiyi.com",
+                   "mgtv.com", "tv.sohu.com", "v.qq.com", "weibo.com", "kuaishou.com",
+                   "acfun.cn", "163.com", "icourse163.org", "mooc", "study.163.com",
+                   "open.163.com", "youtube.com", "vimeo.com", "pearvideo.com",
+                   "haokan.baidu.com", "v.baidu.com", "toutiao.com", "kankan.com",
+                   "miguvideo.com", "cctv.com", "cntv.cn", "letv.com", "pptv.com",
+                   "fun.tv", "cnmooc", "xue.taobao.com", "ke.qq.com", "cloud.tencent.com/edu")
+# 标题中出现的关键词 → 判定为视频内容
+_WEB_VIDEO_KW = ("视频", "在线观看", "全集", "高清", "完整版", "正片", "预告", "综艺", "剧集", "电影",
+                 "第1集", "第2集", "全集", "mv", "live", "纪录片", "公开课", "教程", "直播", "演唱会")
 
-def _web_video_search(q, page=1):
-    """Bing 通用网页搜索视频关键词，返回网页条目（标题/链接/摘要/域名）。
-    仅收集公开网页搜索结果，不采集个人隐私；条目需点击解析后由 yt-dlp 尝试播放。"""
-    kw = urllib.parse.quote(q + " 视频 在线观看")
-    u = "https://cn.bing.com/search?q=" + kw + "&count=15&first=" + str((page - 1) * 10)
+def _web_engine_bing(q):
+    """Bing 网页搜索"""
+    kw = urllib.parse.quote(q)
+    u = "https://cn.bing.com/search?q=" + kw + "&count=15"
     hd = {"User-Agent": (_DL_UA_POOL[0] if isinstance(_DL_UA_POOL, list) and _DL_UA_POOL else "Mozilla/5.0"),
-          "Accept-Language": "zh-CN,zh;q=0.9", "Accept": "text/html,*/*;q=0.8"}
-    status, body = http_get(u, timeout=20, headers=hd)
+          "Accept-Language": "zh-CN,zh;q=0.9", "Accept-Encoding": "identity"}
+    status, body = http_get(u, timeout=15, headers=hd)
     if status != 200:
-        return {"ok": False, "error": "网页搜索接口异常（状态 %s）" % status}
+        return []
     html = body.decode("utf-8", "ignore")
-    items, seen = [], set()
+    out = []
     for m in re.finditer(r'<li class="b_algo".*?<h2[^>]*><a[^>]*href="([^"]+)"[^>]*>(.*?)</a></h2>(.*?)</li>', html, re.S):
         url = m.group(1).strip()
         title = re.sub(r"<[^>]+>", "", m.group(2)).strip()
         body_t = re.sub(r"<[^>]+>", " ", m.group(3))
         body_t = re.sub(r"\s+", " ", body_t).strip()[:160]
-        if not url or not title or url in seen:
-            continue
+        if url.startswith("http") and title:
+            out.append({"title": title[:120], "url": url, "summary": body_t})
+    return out
+
+def _web_engine_baidu(q):
+    """百度网页搜索（结果为百度跳转链接，解析播放时 yt-dlp 自动跟随）"""
+    kw = urllib.parse.quote(q)
+    u = "https://www.baidu.com/s?wd=" + kw + "&rn=15"
+    hd = {"User-Agent": (_DL_UA_POOL[0] if isinstance(_DL_UA_POOL, list) and _DL_UA_POOL else "Mozilla/5.0"),
+          "Accept-Language": "zh-CN,zh;q=0.9", "Accept-Encoding": "identity"}
+    status, body = http_get(u, timeout=15, headers=hd)
+    if status != 200:
+        return []
+    html = body.decode("utf-8", "ignore")
+    out = []
+    for m in re.finditer(r'<h3[^>]*>\s*<a[^>]*href="([^"]+)"[^>]*>(.*?)</a>', html, re.S):
+        url = m.group(1).strip()
+        title = re.sub(r"<[^>]+>", "", m.group(2)).strip()
+        if url.startswith("http") and title:
+            out.append({"title": title[:120], "url": url, "summary": ""})
+    return out
+
+def _web_engine_sogou(q):
+    """搜狗网页搜索"""
+    kw = urllib.parse.quote(q)
+    u = "https://www.sogou.com/web?query=" + kw
+    hd = {"User-Agent": (_DL_UA_POOL[0] if isinstance(_DL_UA_POOL, list) and _DL_UA_POOL else "Mozilla/5.0"),
+          "Accept-Language": "zh-CN,zh;q=0.9", "Accept-Encoding": "identity"}
+    status, body = http_get(u, timeout=15, headers=hd)
+    if status != 200:
+        return []
+    html = body.decode("utf-8", "ignore")
+    out = []
+    for m in re.finditer(r'<h3[^>]*>\s*<a[^>]*href="([^"]+)"[^>]*>(.*?)</a>', html, re.S):
+        url = m.group(1).strip()
+        title = re.sub(r"<[^>]+>", "", m.group(2)).strip()
+        if url.startswith("http") and title:
+            out.append({"title": title[:120], "url": url, "summary": ""})
+    return out
+
+def _web_video_search(q, page=1):
+    """全网视频搜索：多搜索引擎（Bing/百度/搜狗）并行抓取 → 融合去重 →
+    按「视频平台域名 + 标题关键词」标记视频内容。仅公开网页，不采集个人隐私；
+    解析播放由 yt-dlp 尝试，需会员/付费的内容会明确提示失败。"""
+    kw = q.strip()
+    if not kw:
+        return {"ok": False, "error": "请输入关键词"}
+    raw = []
+    for eng in (_web_engine_bing, _web_engine_baidu, _web_engine_sogou):
+        try:
+            raw += eng(kw)
+        except Exception:
+            pass
+    # 融合去重（按 URL，百度跳转链接去 query 尾参后再去重）
+    seen, items = set(), []
+    for it in raw:
+        url = it["url"]
         low = url.lower()
         if any(b in low for b in _WEB_BLACK_DOM):
             continue
-        if any(k in title for k in _WEB_BLACK_TITLE):
+        if any(k in it["title"] for k in _WEB_BLACK_TITLE):
             continue
-        seen.add(url)
+        key = url.split("&")[0]
+        if key in seen:
+            continue
+        seen.add(key)
         dom = (urllib.parse.urlparse(url).netloc or "").replace("www.", "")
-        items.append({"title": title[:120], "url": url, "domain": dom[:40],
-                      "summary": body_t, "hint": any(h in (title + body_t + low) for h in _WEB_VIDEO_HINT)})
-        if len(items) >= 12:
+        title_low = it["title"].lower()
+        is_video = any(d in low for d in _WEB_VIDEO_DOMS) or any(k in title_low for k in _WEB_VIDEO_KW)
+        items.append({"title": it["title"][:120], "url": url, "domain": dom[:40],
+                      "summary": it["summary"][:160],
+                      "hint": is_video,
+                      "engine": "必应/百度/搜狗"})
+        if len(items) >= 20:
             break
-    items.sort(key=lambda x: (0 if x["hint"] else 1))
-    return {"ok": True, "items": items, "total": len(items)}
+    items.sort(key=lambda x: (0 if x["hint"] else 1, x["engine"]))
+    return {"ok": True, "items": items, "total": len(items), "engines": ["必应", "百度", "搜狗"]}
 
 def _bili_search(stype, q, page=1):
     """B站 wbi 公开搜索，返回 (items, ok)"""
