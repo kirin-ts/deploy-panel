@@ -511,7 +511,17 @@ input:focus,textarea:focus{outline:none;border-color:var(--accent)}
             <input id="m-q" class="input" placeholder="输入歌名 / 歌手，如：周杰伦 晴天" style="flex:1">
             <button class="btn btn-primary btn-sm" onclick="mSearch()">搜索</button>
           </div>
-          <div id="m-results" style="margin-top:8px;display:flex;flex-direction:column;gap:4px"></div>
+          <div id="m-sug" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;align-items:center">
+            <span style="color:var(--text2);font-size:12px;line-height:24px">音乐热榜：</span>
+            <button class="btn btn-ghost btn-sm" onclick="mSug('周杰伦 晴天')">周杰伦 晴天</button>
+            <button class="btn btn-ghost btn-sm" onclick="mSug('稻香')">稻香</button>
+            <button class="btn btn-ghost btn-sm" onclick="mSug('起风了')">起风了</button>
+            <button class="btn btn-ghost btn-sm" onclick="mSug('孤勇者')">孤勇者</button>
+            <button class="btn btn-ghost btn-sm" onclick="mSug('平凡之路')">平凡之路</button>
+            <button class="btn btn-ghost btn-sm" onclick="mSug('光年之外')">光年之外</button>
+            <button class="btn btn-ghost btn-sm" onclick="mSug('贝加尔湖畔')">贝加尔湖畔</button>
+          </div>
+          <div id="m-results" style="margin-top:8px;display:flex;flex-direction:column;gap:6px"></div>
           <audio id="m-audio" controls style="width:100%;margin-top:10px" preload="none"></audio>
         </div>
         </div>
@@ -522,7 +532,17 @@ input:focus,textarea:focus{outline:none;border-color:var(--accent)}
             <input id="m-bq" class="input" placeholder="🔍 搜公开小说/漫画名（如：三体、灌篮高手）" style="flex:1;min-width:260px">
             <button class="btn btn-primary btn-sm" onclick="mBSearch()">搜公开内容</button>
           </div>
-          <div id="m-bresults" style="margin-top:6px;display:flex;flex-direction:column;gap:4px"></div>
+          <div id="mb-sug" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;align-items:center">
+            <span style="color:var(--text2);font-size:12px;line-height:24px">小说热榜：</span>
+            <button class="btn btn-ghost btn-sm" onclick="mBSug('三体')">三体</button>
+            <button class="btn btn-ghost btn-sm" onclick="mBSug('盗墓笔记')">盗墓笔记</button>
+            <button class="btn btn-ghost btn-sm" onclick="mBSug('鬼吹灯')">鬼吹灯</button>
+            <button class="btn btn-ghost btn-sm" onclick="mBSug('明朝那些事儿')">明朝那些事儿</button>
+            <button class="btn btn-ghost btn-sm" onclick="mBSug('活着')">活着</button>
+            <button class="btn btn-ghost btn-sm" onclick="mBSug('平凡的世界')">平凡的世界</button>
+            <button class="btn btn-ghost btn-sm" onclick="mBSug('白夜行')">白夜行</button>
+          </div>
+          <div id="m-bresults" style="margin-top:6px;display:flex;flex-direction:column;gap:6px"></div>
           <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
             <input id="m-book-url" class="input" placeholder="或直接粘贴小说/文章页 URL（提取正文阅读）" style="flex:1;min-width:260px">
             <button class="btn btn-primary btn-sm" onclick="mBookLoad()">读正文</button>
@@ -2626,6 +2646,7 @@ async function uaToggleFilter(){
   } catch(e) { toast("切换失败：" + (e && e.message || e)); }
 }
 async function uaVSearch(){
+  window._uaVLastQ=($('#ua-vq').value||'').trim();
   const q=$("#ua-vq").value.trim();
   if(!q){toast("请输入关键词");return;}
   const box=$("#ua-vresults");
@@ -2707,6 +2728,12 @@ function uaVRender(){
   filtered.forEach(it=>{ (groups[it.tag||"其他"]=groups[it.tag||"其他"]||[]).push(it); });
   const keys=Object.keys(groups);
   let html='<span style="color:var(--text2);font-size:12px">找到 '+filtered.length+' 条公开内容'+(window._uaVTag?('（分类：'+window._uaVTag+'）'):'')+'</span>';
+  // 「你可能也在找」推荐 chips（内置相关词，点击即搜）
+  const _rel=[["公开课","公开课"],["纪录片","纪录片"],["Python 教程","Python 教程"],["航拍中国","航拍中国"],["三体","三体"],["周杰伦","周杰伦"]];
+  const _cur=(window._uaVLastQ||"").trim();
+  const _relShow=_rel.filter(r=>!(_cur&&r[0].indexOf(_cur)>-1)).slice(0,4);
+  html+='<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;align-items:center"><span style="color:var(--text2);font-size:12px">你可能也在找：</span>'+
+    _relShow.map(r=>'<button class="btn btn-ghost btn-sm" data-q="'+esc(r[1])+'" onclick="uaVSug(this)">'+esc(r[1])+'</button>').join("")+'</div>';
   if(!filtered.length){html+='<div style="color:var(--text2);font-size:12px;margin-top:6px">该分类暂无内容，可切回「全部」查看</div>';}
   keys.forEach(tag=>{
     const g=groups[tag];
@@ -2767,7 +2794,8 @@ function uaVDlUrl(url){
   uaDlStartWith(url);
 }
 
-function uaVQ(t){$("#ua-vq").value=t;uaVSearch();}
+function uaVQ(t){$("#ua-vq").value=t;window._uaVLastQ=t;uaVSearch();}
+function uaVSug(b){uaVQ((b.dataset.q||'').trim());}
 function uaVPlay(i){
   const it=(window._uaVItems||[])[i]; if(!it)return;
   if(window._uaSecLevel==="danger"){toast("危险站点已禁止");return;}
@@ -2792,6 +2820,7 @@ function uaDlStartWith(u){
 
 /* ===== 媒体中心 · 音乐 ===== */
 let mTmp=null, mItems=[];
+function mSug(t){$("#m-q").value=t;mSearch();}
 async function mSearch(){
   const q=$("#m-q").value.trim();
   if(!q){toast("请输入歌名/歌手");return;}
@@ -2801,9 +2830,12 @@ async function mSearch(){
   if(!r.ok){box.innerHTML='<span style="color:#e07b7b;font-size:12px">'+(r.error||"搜索失败")+'</span>';return;}
   mItems=r.items||[];
   box.innerHTML=(mItems.length?("找到 "+mItems.length+" 条公开内容（来源："+(r.sources||[]).join("/")+"）"):"无结果")+
-    mItems.map((it,i)=>'<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 8px;border-bottom:1px solid var(--line)">'+
-      '<span style="font-size:13px;flex:1;word-break:break-all">'+esc(it.title)+'<span style="color:var(--text2);font-size:11px"> · '+esc(it.author||"-")+' · '+esc(it.duration||"-")+'</span></span>'+
-      '<button class="btn btn-sm" style="border-color:#4fd08a;color:#4fd08a" onclick="mPlay('+i+')">▶ 播放</button></div>').join("");
+    mItems.map((it,i)=>'<div class="ua-card" style="padding:8px">'+
+      '<div style="font-size:13px;font-weight:600;word-break:break-all">'+esc(it.title)+'</div>'+
+      '<div style="color:var(--text2);font-size:11px;margin-top:2px">'+esc(it.author||"-")+' · '+esc(it.duration||"-")+' · 来源：'+esc(it.platform||"-")+'</div>'+
+      '<div style="display:flex;gap:6px;margin-top:6px">'+
+      '<button class="btn btn-sm" style="border-color:#4fd08a;color:#4fd08a" onclick="mPlay('+i+')">▶ 播放</button>'+
+      '</div></div>').join("");
 }
 async function mPlay(i){
   const it=(mItems||[])[i]; if(!it)return;
@@ -2832,6 +2864,7 @@ function mFont(d){const el=$("#m-read-body");let s=parseInt(el.style.fontSize||1
 
 /* ===== 媒体中心 · 小说/漫画 ===== */
 let mComicImgs=[], mComicIdx=0, mFontSz=15;
+function mBSug(t){$("#m-bq").value=t;mBSearch();}
 async function mBSearch(){
   const q=$("#m-bq").value.trim();
   if(!q){toast("请输入书名/关键词");return;}
@@ -2841,9 +2874,12 @@ async function mBSearch(){
   if(!r.ok){box.innerHTML='<span style="color:#e07b7b;font-size:12px">'+(r.error||"搜索失败")+'</span>';return;}
   const its=r.items||[];
   box.innerHTML=(its.length?("找到 "+its.length+" 条公开内容（来源："+(r.sources||[]).join("/")+"）"):'<span style="color:var(--text2);font-size:12px">无结果</span>')+
-    its.map((it,i)=>'<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 8px;border-bottom:1px solid var(--line)">'+
-      '<span style="font-size:13px;flex:1;word-break:break-all">'+esc(it.title)+'<span style="color:var(--text2);font-size:11px"> · '+esc(it.author||"-")+'</span></span>'+
-      '<button class="btn btn-sm" style="border-color:var(--accent);color:var(--accent)" onclick="mBookReadUrl('+i+')">阅读</button></div>').join("");
+    its.map((it,i)=>'<div class="ua-card" style="padding:8px">'+
+      '<div style="font-size:13px;font-weight:600;word-break:break-all">'+esc(it.title)+'</div>'+
+      '<div style="color:var(--text2);font-size:11px;margin-top:2px">'+esc(it.author||"-")+' · 来源：'+esc(it.platform||"-")+'</div>'+
+      '<div style="display:flex;gap:6px;margin-top:6px">'+
+      '<button class="btn btn-sm" style="border-color:var(--accent);color:var(--accent)" onclick="mBookReadUrl('+i+')">阅读</button>'+
+      '</div></div>').join("");
   window._mBItems=its;
 }
 function mBookReadUrl(i){
