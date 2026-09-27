@@ -1882,13 +1882,9 @@ def _cls_tag(title):
 _WEB_BLACK_DOM = ("baike.baidu", "zdic.net", "hanyuguoxue", "chinesewords.org", "jd.com",
                     "taobao.com", "tmall.com", "dangdang.com", "39.net", "docin.com",
                     "wenku.baidu", "cqvip", "wanfangdata", "dict.", "cnki",
-                    "jzvideo", "baiduvideo", "yingyuan", "qingse", "vod", "ppzy",
-                    "zuidazy", "maoyun", "kandian", "m3u8",
                     "jjwxc", "qidian", "zhulang", "huayue", "biquge",
                     "weread", "fanqienovel", "fanqie", "qingting", "ximalaya")
-_WEB_BLACK_TITLE = ("免费观看", "免费追剧", "高清影视", "影视大全", "在线影院", "免费影院",
-                    "影视资源", "海量片库", "蓝光画质", "电影天堂", "站长", "APP下载",
-                    "在线播放", "网盘资源")
+_WEB_BLACK_TITLE = ("站长", "APP下载", "网盘资源", "文库", "下载文档")
 # 视频平台域名白名单：命中即判定为视频平台页（解析播放成功率更高）
 _WEB_VIDEO_DOMS = ("bilibili.com", "douyin.com", "ixigua.com", "youku.com", "iqiyi.com",
                    "mgtv.com", "tv.sohu.com", "v.qq.com", "weibo.com", "kuaishou.com",
@@ -1986,9 +1982,11 @@ def _web_video_search(q, page=1):
         dom = (urllib.parse.urlparse(url).netloc or "").replace("www.", "")
         title_low = it["title"].lower()
         is_video = any(d in low for d in _WEB_VIDEO_DOMS) or any(k in title_low for k in _WEB_VIDEO_KW)
+        if not is_video:
+            continue  # 只保留视频类资源，过滤书籍/百科/官网等非视频页
         items.append({"title": it["title"][:120], "url": url, "domain": dom[:40],
                       "summary": it["summary"][:160],
-                      "hint": is_video,
+                      "hint": True,
                       "engine": "必应/百度/搜狗"})
         if len(items) >= 20:
             break
