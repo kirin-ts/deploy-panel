@@ -1811,12 +1811,15 @@ def api_video_search(params):
     if not q:
         return {"ok": False, "error": "请输入关键词"}
     page = int(params.get("page") or 1)
+    stype = str(params.get("type") or "video")
+    if stype not in ("video", "article"):
+        stype = "video"
     items = []
     srcs = []
     # 通道1：B站公开搜索（wbi 端点，带 UA/Referer）
     try:
         kw = urllib.parse.quote(q)
-        u = "https://api.bilibili.com/x/web-interface/wbi/search/type?search_type=video&keyword=" + kw + "&page=" + str(min(page, 50))
+        u = "https://api.bilibili.com/x/web-interface/wbi/search/type?search_type=" + stype + "&keyword=" + kw + "&page=" + str(min(page, 50))
         hd = {"User-Agent": _DL_UA_POOL[0] if isinstance(_DL_UA_POOL, list) and _DL_UA_POOL else "Mozilla/5.0",
               "Referer": "https://www.bilibili.com/"}
         status, body = http_get(u, timeout=15, headers=hd)
@@ -1830,6 +1833,18 @@ def api_video_search(params):
                     if "cheese" in arcurl.lower() or "bilibili.com/cheese" in arcurl.lower():
                         continue
                     title = re.sub(r"<[^>]+>", "", it.get("title") or "")
+                    if stype == "article":
+                        cid = it.get("id") or ""
+                        art_url = arcurl or it.get("url") or (("https://www.bilibili.com/read/cv" + str(cid)) if cid else "")
+                        pub = str(it.get("pubdate") or it.get("pub_time") or "")[:10]
+                        items.append({
+                            "platform": "B站专栏", "title": title,
+                            "url": art_url,
+                            "bv": "", "duration": ((it.get("author") or "") + (" · " + pub if pub else "")),
+                            "author": it.get("author") or "",
+                            "play": it.get("view") or 0, "kind": "article",
+                        })
+                        continue
                     bvid = it.get("bvid") or ""
                     dur = it.get("duration") or ""
                     dur_txt = dur if isinstance(dur, str) and ":" in dur else (str(int(dur) // 60) + ":" + str(int(dur) % 60).zfill(2)) if str(dur).isdigit() else ""
@@ -2477,13 +2492,8 @@ _DL_TID = [0]
 
 
 def _dl_platform(u, ddir, prog=None):
-    """平台视频识别：返回 (path,size,ctype,kind)；不支持/解析失败抛 RuntimeError"""
-    host = urllib.parse.urlparse(u).netloc.lower()
-    if "bilibili.com" in host or "b23.tv" in host:
-        return _dl_bilibili(u, ddir, prog)
-    if "douyin.com" in host or "iesdouyin.com" in host:
-        return _dl_douyin(u, ddir, prog)
-    raise RuntimeError("unknown platform")
+    """平台视频一律走 yt-dlp（自带签名/直链/合并处理）。"""
+    return _dl_ytdlp(u, ddir, prog=prog)
 
 
 def _dl_bilibili(u, ddir, prog=None):
@@ -2670,6 +2680,25 @@ def api_url_dl_start(params):
         _DL_TASKS[tid] = task
     threading.Thread(target=_dl_worker, args=(task,), daemon=True).start()
     return {"ok": True, "task_id": tid, "total": len(urls)}
+
+
+def api_url_dl_tasks(params):
+    """下载任务面板：进行中任务 + 最近完成结果（含失败原因）"""
+    with _DL_LOCK:
+        running, done = [], []
+        for tid, t in _DL_TASKS.items():
+            d = dict(t)
+            if d.get("done"):
+                done.append({"task_id": tid, "done": True, "ok_count": d.get("ok_count"),
+                             "total": d.get("total"), "results": d.get("results") or [],
+                             "item_url": d.get("item_url")})
+                continue
+            down, total = d.get("item_prog", (0, 0))
+            pct = int(down * 100 / total) if total else -1
+            running.append({"task_id": tid, "pct": pct, "down": down,
+                            "item_url": d.get("item_url"), "cur": d.get("cur"), "total": d.get("total")})
+    done = done[-3:][::-1]
+    return {"ok": True, "running": running, "done": done}
 
 
 def api_url_dl_progress(params):
@@ -2975,6 +3004,8 @@ class Handler(BaseHTTPRequestHandler):
                     return self._send(200, f.read(), "text/html; charset=utf-8")
             if parsed.path == "/api/video/search":
                 return self._send(200, json.dumps(api_video_search(params), ensure_ascii=False).encode("utf-8"))
+            if parsed.path == "/api/url/dl_tasks":
+                return self._send(200, json.dumps(api_url_dl_tasks(params), ensure_ascii=False).encode("utf-8"))
             if parsed.path == "/api/url/play_progress":
                 return self._send(200, json.dumps(api_url_play_progress(params), ensure_ascii=False).encode("utf-8"))
             if parsed.path == "/api/url/play_clean":

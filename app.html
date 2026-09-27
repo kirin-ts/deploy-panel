@@ -499,7 +499,12 @@ input:focus,textarea:focus{outline:none;border-color:var(--accent)}
         <div class="ua-card" style="margin-top:12px">
           <b>📚 漫画 / 小说阅读（粘贴公开网页链接，本机提取内容）</b>
           <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
-            <input id="m-book-url" class="input" placeholder="小说/文章页 URL（提取正文阅读）" style="flex:1;min-width:260px">
+            <input id="m-bq" class="input" placeholder="🔍 搜公开小说/漫画名（如：三体、灌篮高手）" style="flex:1;min-width:260px">
+            <button class="btn btn-primary btn-sm" onclick="mBSearch()">搜公开内容</button>
+          </div>
+          <div id="m-bresults" style="margin-top:6px;display:flex;flex-direction:column;gap:4px"></div>
+          <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
+            <input id="m-book-url" class="input" placeholder="或直接粘贴小说/文章页 URL（提取正文阅读）" style="flex:1;min-width:260px">
             <button class="btn btn-primary btn-sm" onclick="mBookLoad()">读正文</button>
           </div>
           <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap;align-items:center">
@@ -530,6 +535,10 @@ input:focus,textarea:focus{outline:none;border-color:var(--accent)}
               <button class="btn btn-sm" id="dl-del-btn" onclick="dlDelSelected()" disabled style="color:#ff6b6b;border-color:#ff6b6b55">删除选中</button>
               <button class="btn btn-primary btn-sm" onclick="dlOpenDir()">打开下载目录</button>
             </div>
+          </div>
+          <div id="dl-active" class="hidden" style="margin-top:12px;border-top:1px dashed var(--line);padding-top:10px">
+            <b style="font-size:13px">进行中任务</b>
+            <div id="dl-active-list" style="display:flex;flex-direction:column;gap:4px;margin-top:6px"></div>
           </div>
           <div id="dl-files" style="margin-top:10px;display:flex;flex-direction:column;gap:4px"></div>
         </div>
@@ -771,7 +780,7 @@ function show(view){
   const titles={search:"项目搜索",audit:"合规审核中心",deploy:"我的部署",pack:"环境打包",settings:"设置",flow:"网址分析",media:"媒体中心",downloads:"下载资源",app:"应用搭建器"};
   $("#view-title").textContent=titles[view]||"";
   if(view==="deploy") renderDeploys();
-  if(view==="downloads") dlRefresh();
+  if(view==="downloads"){ dlRefresh(); dlActivePoll(); }
 }
 $$(".nav-item").forEach(i=>i.addEventListener("click",()=>show(i.dataset.view)));
 
@@ -2307,6 +2316,37 @@ async function uaOpenOne(fp){
   const r=await apiPost("url/dl_open",{path:fp});
   if(!r.ok)toast(r.error);
 }
+let _dlActivePrev=0;
+async function dlActivePoll(){
+  const r=await api("url/dl_tasks",{});
+  const run=(r.ok&&r.running)||[], dones=(r.ok&&r.done)||[];
+  const wrap=$("#dl-active"), list=$("#dl-active-list");
+  if(!run.length && !dones.length){
+    wrap.classList.add("hidden");
+    return;
+  }
+  wrap.classList.remove("hidden");
+  const runHtml=run.map(t=>{
+    const pct=t.pct>=0?t.pct:0;
+    return '<div style="background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:6px 8px;margin-top:6px">'+
+      '<div style="display:flex;justify-content:space-between;gap:8px;font-size:12px">'+
+      '<span style="color:var(--text2);word-break:break-all;flex:1">'+esc((t.item_url||"").slice(0,80))+'</span>'+
+      '<span style="color:var(--accent);flex:none">'+(t.pct>=0?t.pct+"%":fmtSize(t.down||0))+'</span></div>'+
+      '<div style="height:6px;background:#ffffff1a;border-radius:3px;overflow:hidden;margin-top:5px"><div style="height:100%;width:'+pct+'%;background:var(--accent);transition:width .4s"></div></div></div>';
+  }).join("");
+  const doneHtml=dones.map(t=>{
+    const bad=t.results.filter(x=>!x.ok);
+    const okc=(t.ok_count||0);
+    return '<div style="background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:6px 8px;margin-top:6px;font-size:12px">'+
+      (okc>0?'<span style="color:#7ee2b8">成功 '+okc+'/'+t.total+'</span>':'<span style="color:#e07b7b">下载未完成</span>')+
+      (bad.length?'<div style="color:#e07b7b;margin-top:3px;word-break:break-all">'+esc(bad[0].error||bad[0].url.slice(0,60))+'</div>':'')+
+      '</div>';
+  }).join("");
+  list.innerHTML=(runHtml?('<div style="font-size:12px;color:var(--text2)">进行中</div>'+runHtml):'')+
+    (doneHtml?('<div style="font-size:12px;color:var(--text2);margin-top:8px">最近完成</div>'+doneHtml):'');
+  if(dones.length) dlRefresh();
+  setTimeout(dlActivePoll,1500);
+}
 async function dlRefresh(){
   $("#dl-files").innerHTML='<span style="color:var(--text2);font-size:12px">加载中…</span>';
   const r=await api("url/dl_files",{});
@@ -2544,8 +2584,27 @@ function mFont(d){const el=$("#m-read-body");let s=parseInt(el.style.fontSize||1
 
 /* ===== 媒体中心 · 小说/漫画 ===== */
 let mComicImgs=[], mComicIdx=0, mFontSz=15;
-async function mBookLoad(){
-  const u=$("#m-book-url").value.trim();
+async function mBSearch(){
+  const q=$("#m-bq").value.trim();
+  if(!q){toast("请输入书名/关键词");return;}
+  const box=$("#m-bresults");
+  box.innerHTML='<span style="color:var(--text2);font-size:12px">搜索中…</span>';
+  const r=await api("video/search",{q:q,type:"article"});
+  if(!r.ok){box.innerHTML='<span style="color:#e07b7b;font-size:12px">'+(r.error||"搜索失败")+'</span>';return;}
+  const its=r.items||[];
+  box.innerHTML=(its.length?("找到 "+its.length+" 条公开内容（来源："+(r.sources||[]).join("/")+"）"):'<span style="color:var(--text2);font-size:12px">无结果</span>')+
+    its.map((it,i)=>'<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 8px;border-bottom:1px solid var(--line)">'+
+      '<span style="font-size:13px;flex:1;word-break:break-all">'+esc(it.title)+'<span style="color:var(--text2);font-size:11px"> · '+esc(it.author||"-")+'</span></span>'+
+      '<button class="btn btn-sm" style="border-color:var(--accent);color:var(--accent)" onclick="mBookReadUrl('+i+')">阅读</button></div>').join("");
+  window._mBItems=its;
+}
+function mBookReadUrl(i){
+  const it=(window._mBItems||[])[i]; if(!it||!it.url)return;
+  $("#m-book-url").value=it.url;
+  mBookLoad(it.url);
+}
+async function mBookLoad(u0){
+  const u=(u0||$("#m-book-url").value.trim());
   if(!/^https?:\/\//i.test(u)){toast("请粘贴 http(s):// 链接");return;}
   $("#m-read-body").textContent="正在提取正文…";
   const r=await apiPost("media/article",{url:u});
