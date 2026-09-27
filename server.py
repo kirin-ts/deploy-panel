@@ -3007,7 +3007,7 @@ def _play_worker(task):
             args += ["-map", "0:v", "-map", "0:a?"]
         vc = (info.get("vcodec") or "").lower()
         # 音频统一转码 AAC（B站分离流 m4a copy 进 fMP4 会在浏览器解码失败）
-        if vc and (vc.startswith("hvc") or vc.startswith("hev")):
+        if vc and (vc.startswith("hvc") or vc.startswith("hev") or vc.startswith("av")):
             # HEVC 浏览器无法直接解码 → 转码 H264（画质 veryfast，可播优先）
             args += ["-c:v", "libx264", "-preset", "veryfast", "-crf", "23", "-pix_fmt", "yuv420p",
                      "-c:a", "aac", "-b:a", "128k", "-ar", "44100",
