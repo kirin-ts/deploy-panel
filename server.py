@@ -1906,8 +1906,11 @@ _FILTER_DEFAULTS = {
     "free_sites": ["tv.cctv.com", "jishi.cctv.com", "bilibili.com", "1905.com",
                    "open.163.com", "icourse163.org", "ixigua.com", "v.douyin.com",
                    "v.kuaishou.com", "pearvideo.com", "tv.cctv.com/videos"],
+    "pirate_doms": ["btbtdy.com", "btbtdy.cc", "dy2018.com", "dytt8.net", "dytt89.com",
+                    "80s.tw", "80s.la", "okzyw.com", "1080zyk.com", "zxzj.pro",
+                    "66s.cc", "nfmovies.com", "tvb123.com", "qq7799.com", "5dianying.com"],
 }
-_FILTER_KEYS = ("black_dom", "black_title", "video_doms", "paid_doms", "junk_title", "free_sites")
+_FILTER_KEYS = ("black_dom", "black_title", "video_doms", "paid_doms", "junk_title", "free_sites", "pirate_doms")
 _FILTERS = dict(_FILTER_DEFAULTS)
 _FILTER_FILE = os.path.join(DATA, "filters.json")
 
@@ -1940,6 +1943,7 @@ _WEB_VIDEO_DOMS = tuple(_FILTERS["video_doms"])
 _WEB_PAID_DOMS = tuple(_FILTERS["paid_doms"])
 _WEB_JUNK_TITLE = tuple(_FILTERS["junk_title"])
 _WEB_FREE_SITES = tuple(_FILTERS["free_sites"])
+_WEB_PIRATE_DOMS = tuple(_FILTERS["pirate_doms"])
 
 def _web_engine_bing(q):
     """Bing 网页搜索"""
@@ -2072,6 +2076,8 @@ def _web_video_search(q, page=1):
         if not _nofilter_on():
             if any(b in low for b in _WEB_BLACK_DOM):
                 continue
+            if any(d in low for d in _WEB_PIRATE_DOMS):
+                continue  # 非授权/盗版影视站（默认过滤，用户可在「过滤配置」中放行）
             if any(k in it["title"] for k in _WEB_BLACK_TITLE):
                 continue
         key = url.split("&")[0]
@@ -2142,6 +2148,7 @@ def api_media_filters(body):
         _WEB_PAID_DOMS = tuple(_FILTERS["paid_doms"])
         _WEB_JUNK_TITLE = tuple(_FILTERS["junk_title"])
         _WEB_FREE_SITES = tuple(_FILTERS["free_sites"])
+        _WEB_PIRATE_DOMS = tuple(_FILTERS["pirate_doms"])
     return {"ok": True, "filters": {k: _FILTERS[k] for k in _FILTER_KEYS}}
 
 def _bili_search(stype, q, page=1):

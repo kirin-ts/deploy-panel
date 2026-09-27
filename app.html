@@ -779,7 +779,7 @@ input:focus,textarea:focus{outline:none;border-color:var(--accent)}
       <span style="flex:1"></span>
       <button class="btn btn-sm" onclick="uaCloseFilterCfg()">关闭</button>
     </div>
-    <div style="font-size:12px;color:var(--text2);margin-bottom:10px;line-height:1.6">过滤名单全部可编辑：点 × 删除条目，输入后回车或点「添加」新增条目。改动即时保存、下次搜索立即生效。付费平台黑名单若被移除，相关付费内容将出现在结果中，其播放需会员——相关风险由你自行评估。</div>
+    <div style="font-size:12px;color:var(--text2);margin-bottom:10px;line-height:1.6">正版/盗版与全部过滤口径均由你掌控：点 × 删除条目，输入后回车或点「添加」新增。改动即时保存、下次搜索立即生效。<b style="color:var(--warn,#d97706)">「非授权/盗版影视站黑名单」默认过滤盗版聚合站，删除其中条目即表示你放行该站——播放盗版内容的法律风险由你自行承担；付费平台黑名单同理，移除后付费内容将出现但其播放需会员。</b></div>
     <div id="ua-fg-body" style="display:flex;flex-direction:column;gap:10px"></div>
   </div>
 </div>
@@ -2584,7 +2584,7 @@ function mtTab(name,btn){
     b.style.background=on?"var(--accent11,#eaf1ff)":"";
   });
 }
-const _FG_META=[["black_dom","非视频站黑名单(域名)"],["black_title","黑名单标题词"],["video_doms","免费视频平台白名单(域名)"],["paid_doms","付费/会员平台黑名单(域名)"],["junk_title","非正片标题词(解说/小说等)"],["free_sites","站内搜索免费站点"]];
+const _FG_META=[["pirate_doms","非授权/盗版影视站黑名单(域名) · 默认过滤，删除=放行，风险自担"],["black_dom","非视频站黑名单(域名)"],["black_title","黑名单标题词"],["video_doms","免费视频平台白名单(域名)"],["paid_doms","付费/会员平台黑名单(域名)"],["junk_title","非正片标题词(解说/小说等)"],["free_sites","站内搜索免费站点"]];
 let _fgData={};
 function uaOpenFilterCfg(){
   const mask=document.getElementById("ua-fg-mask");
