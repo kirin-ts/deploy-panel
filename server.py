@@ -3382,7 +3382,10 @@ def api_url_dl_delete(params):
                 continue
             deleted.append(fp)
         except Exception as e:
-            failed.append({"path": fp, "error": str(e)[:80]})
+            msg = str(e)[:80]
+            if "另一进程" in msg or "being used" in msg or "WinError 32" in msg or "PermissionError" in msg:
+                msg = "文件被占用（可能正在预览/播放中），请关闭后重试"
+            failed.append({"path": fp, "error": msg})
     if deleted:
         try:
             lp = os.path.join(DATA, "download_log.json")
