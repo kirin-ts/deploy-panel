@@ -1695,6 +1695,115 @@ def _detect_platform(host):
     return ""
 
 
+def _fetch_page(u):
+    """抓取页面 HTML（带 UA，编码自动识别 utf-8/gbk）"""
+    hd = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0 Safari/537.36",
+          "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+          "Accept-Language": "zh-CN,zh;q=0.9",
+          "Referer": "https://www.baidu.com/"}
+    req = urllib.request.Request(u, headers=hd)
+    with urllib.request.urlopen(req, timeout=20) as resp:
+        raw = resp.read(4 * 1024 * 1024)
+        enc = (resp.headers.get("Content-Encoding") or "").lower()
+        if enc in ("gzip", "x-gzip"):
+            import gzip
+            raw = gzip.decompress(raw)
+        elif enc == "deflate":
+            import zlib
+            raw = zlib.decompress(raw)
+        head = raw[:2000]
+        ctype = resp.headers.get("Content-Type", "").lower()
+        for enc in ("utf-8", "gbk", "gb18030"):
+            if enc in ctype or ("charset=" + enc) in head.decode("ascii", "ignore").lower():
+                try:
+                    return raw.decode(enc, "replace")
+                except Exception:
+                    break
+        try:
+            return raw.decode("utf-8", "replace")
+        except Exception:
+            return raw.decode("gb18030", "replace")
+
+
+def _extract_text(html):
+    """粗略正文提取：去脚本/导航标签后取最长中文文本段"""
+    h = re.sub(r"<(script|style|nav|header|footer|aside|form|svg)[^>]*>.*?</\1>", "\n", html,
+               flags=re.S | re.I)
+    h = re.sub(r"<br\s*/?>", "\n", h, flags=re.I)
+    h = re.sub(r"</(p|div|h[1-6]|li|tr|section|article)>", "\n", h, flags=re.I)
+    h = re.sub(r"<[^>]+>", "", h)
+    h = re.sub(r"&nbsp;?", " ", h)
+    h = re.sub(r"&[a-z]+;", " ", h)
+    lines = [ln.strip() for ln in h.splitlines()]
+    lines = [ln for ln in lines if len(ln) >= 6 and not re.fullmatch(r"[\W_]+", ln)]
+    best, cur = [], []
+    for ln in lines:
+        if len(ln) >= 10:
+            cur.append(ln)
+        else:
+            if sum(len(x) for x in cur) > sum(len(x) for x in best):
+                best = cur
+            cur = []
+    if sum(len(x) for x in cur) > sum(len(x) for x in best):
+        best = cur
+    return best if best else lines[:200]
+
+
+def _extract_images(html, base_url):
+    """漫画/图文页：提取内容图片（过滤图标/小图）"""
+    out, seen = [], set()
+    pat = re.compile(r"<img[^>]+?(?:data-src|data-original|src)=[\"']([^\"']+)[\"']", re.I)
+    for m in pat.finditer(html):
+        u = urllib.parse.urljoin(base_url, m.group(1))
+        if not u.startswith(("http://", "https://")):
+            continue
+        low = u.lower()
+        if any(k in low for k in ("logo", "icon", "avatar", "emoji", "sprite", "spinner",
+                                  "loading", "ad-", "banner", "qr", "erweima", "data:image")):
+            continue
+        if u in seen:
+            continue
+        seen.add(u)
+        out.append(u)
+        if len(out) >= 120:
+            break
+    return out
+
+
+def api_media_article(params):
+    """POST {url} → 提取网页正文（小说/文章阅读）"""
+    u = str(params.get("url") or "").strip()
+    if not u.startswith(("http://", "https://")):
+        return {"ok": False, "error": "请提供 http(s):// 链接"}
+    try:
+        html = _fetch_page(u)
+        m = re.search(r"<title[^>]*>([^<]+)</title>", html, re.I | re.S)
+        title = (m.group(1).strip() if m else "")[:80] or "页面内容"
+        text = _extract_text(html)
+        if not text:
+            return {"ok": False, "error": "未提取到正文（页面可能需要登录或为图片型内容）"}
+        return {"ok": True, "title": title, "text": text, "chars": sum(len(x) for x in text)}
+    except Exception as e:
+        return {"ok": False, "error": "抓取失败：" + str(e)[:150]}
+
+
+def api_media_manga(params):
+    """POST {url} → 提取图片序列（漫画/图集阅读）"""
+    u = str(params.get("url") or "").strip()
+    if not u.startswith(("http://", "https://")):
+        return {"ok": False, "error": "请提供 http(s):// 链接"}
+    try:
+        html = _fetch_page(u)
+        m = re.search(r"<title[^>]*>([^<]+)</title>", html, re.I | re.S)
+        title = (m.group(1).strip() if m else "")[:80] or "图片内容"
+        imgs = _extract_images(html, u)
+        if not imgs:
+            return {"ok": False, "error": "未提取到图片（页面可能需要登录或动态加载）"}
+        return {"ok": True, "title": title, "images": imgs}
+    except Exception as e:
+        return {"ok": False, "error": "抓取失败：" + str(e)[:150]}
+
+
 def api_video_search(params):
     """公开视频聚合搜索：主通道 B站公开搜索接口（无需登录），可选 yt-dlp(ytsearch)。
     仅返回公开内容；付费/会员内容不索引。"""
@@ -3057,6 +3166,10 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(200, json.dumps(api_url_download(body), ensure_ascii=False).encode("utf-8"))
             if parsed.path == "/api/url/dl_video":
                 return self._send(200, json.dumps(api_url_dl_video(body), ensure_ascii=False).encode("utf-8"))
+            if parsed.path == "/api/media/article":
+                return self._send(200, json.dumps(api_media_article(body), ensure_ascii=False).encode("utf-8"))
+            if parsed.path == "/api/media/manga":
+                return self._send(200, json.dumps(api_media_manga(body), ensure_ascii=False).encode("utf-8"))
             if parsed.path == "/api/url/play_prep":
                 return self._send(200, json.dumps(api_url_play_prep(body), ensure_ascii=False).encode("utf-8"))
             if parsed.path == "/api/url/dl_start":

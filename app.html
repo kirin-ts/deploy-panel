@@ -319,6 +319,7 @@ input:focus,textarea:focus{outline:none;border-color:var(--accent)}
       <div class="nav-item" data-view="deploy"><svg viewBox="0 0 24 24"><path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M5 21h14"/></svg><span>我的部署</span></div>
       <div class="nav-item" data-view="pack"><svg viewBox="0 0 24 24"><path d="M21 8l-9-5-9 5v8l9 5 9-5V8z"/><path d="M3 8l9 5 9-5"/><path d="M12 13v8"/></svg><span>环境打包</span></div>
       <div class="nav-item" data-view="flow"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M16.5 16.5 L21 21" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg><span>网址分析</span></div>
+      <div class="nav-item" data-view="media"><svg viewBox="0 0 24 24"><path d="M6 4v16"/><path d="M18 7v10"/><rect x="2" y="4" width="4" height="16" rx="1"/><rect x="18" y="7" width="4" height="10" rx="1"/></svg><span>媒体中心</span></div>
       <div class="nav-item" data-view="downloads"><svg viewBox="0 0 24 24"><path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M5 21h14"/></svg><span>下载资源</span></div>
       <div class="nav-item" data-view="app"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="9" height="9" rx="2"/><rect x="14" y="14" width="7" height="7" rx="2"/><path d="M14 7h7M17.5 3.5v7"/></svg><span>应用搭建器</span></div>
       <div class="nav-item" data-view="settings"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 0 0-.1-1.2l2-1.6-2-3.4-2.4 1a7 7 0 0 0-2-1.2L14 3h-4l-.5 2.6a7 7 0 0 0-2 1.2l-2.4-1-2 3.4 2 1.6a7 7 0 0 0 0 2.4l-2 1.6 2 3.4 2.4-1a7 7 0 0 0 2 1.2L10 21h4l.5-2.6a7 7 0 0 0 2-1.2l2.4 1 2-3.4-2-1.6c.06-.4.1-.8.1-1.2z"/></svg><span>设置</span></div>
@@ -444,22 +445,6 @@ input:focus,textarea:focus{outline:none;border-color:var(--accent)}
             <div id="ua-files" style="margin-top:6px;display:flex;flex-direction:column;gap:3px"></div>
           </div>
         </div>
-        <div id="ua-vsearch" class="ua-card">
-          <b>🎬 公开视频聚合搜索（仅公开/免费内容 · 付费会员内容不索引）</b>
-          <div style="display:flex;gap:6px;margin-top:8px">
-            <input id="ua-vq" class="input" placeholder="输入关键词，如：机器学习 入门" style="flex:1">
-            <button class="btn btn-primary btn-sm" onclick="uaVSearch()">搜索</button>
-          </div>
-          <div id="ua-vq-sug" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px">
-            <span style="color:var(--text2);font-size:12px;line-height:24px">热门：</span>
-            <button class="btn btn-ghost btn-sm" onclick="uaVQ('公开课')">公开课</button>
-            <button class="btn btn-ghost btn-sm" onclick="uaVQ('教程')">教程</button>
-            <button class="btn btn-ghost btn-sm" onclick="uaVQ('纪录片')">纪录片</button>
-            <button class="btn btn-ghost btn-sm" onclick="uaVQ('前端')">前端</button>
-            <button class="btn btn-ghost btn-sm" onclick="uaVQ('Python')">Python</button>
-          </div>
-          <div id="ua-vresults" style="margin-top:8px;display:flex;flex-direction:column;gap:6px"></div>
-        </div>
         <div id="ua-script-recs" class="ua-card hidden">
           <b>🧩 脚本推荐（选择方案自动生成可运行爬虫）</b>
           <div id="ua-script-list" style="margin-top:8px;display:flex;flex-direction:column;gap:6px"></div>
@@ -481,6 +466,58 @@ input:focus,textarea:focus{outline:none;border-color:var(--accent)}
       </div>
     </section>
 
+    <!-- 媒体中心 -->
+    <section id="view-media" class="hidden">
+      <div class="ua-wrap">
+        <div class="ua-card">
+          <b>🎬 公开视频聚合搜索（仅公开/免费内容 · 付费会员内容不索引）</b>
+          <div style="display:flex;gap:6px;margin-top:8px">
+            <input id="ua-vq" class="input" placeholder="输入关键词，如：机器学习 入门" style="flex:1">
+            <button class="btn btn-primary btn-sm" onclick="uaVSearch()">搜索</button>
+          </div>
+          <div id="ua-vq-sug" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px">
+            <span style="color:var(--text2);font-size:12px;line-height:24px">热门：</span>
+            <button class="btn btn-ghost btn-sm" onclick="uaVQ('公开课')">公开课</button>
+            <button class="btn btn-ghost btn-sm" onclick="uaVQ('教程')">教程</button>
+            <button class="btn btn-ghost btn-sm" onclick="uaVQ('纪录片')">纪录片</button>
+            <button class="btn btn-ghost btn-sm" onclick="uaVQ('前端')">前端</button>
+            <button class="btn btn-ghost btn-sm" onclick="uaVQ('Python')">Python</button>
+          </div>
+          <div id="ua-vresults" style="margin-top:8px;display:flex;flex-direction:column;gap:6px"></div>
+        </div>
+
+        <div class="ua-card" style="margin-top:12px">
+          <b>🎵 公开音乐（B站公开音频 · 仅公开/免费内容）</b>
+          <div style="display:flex;gap:6px;margin-top:8px">
+            <input id="m-q" class="input" placeholder="输入歌名 / 歌手，如：周杰伦 晴天" style="flex:1">
+            <button class="btn btn-primary btn-sm" onclick="mSearch()">搜索</button>
+          </div>
+          <div id="m-results" style="margin-top:8px;display:flex;flex-direction:column;gap:4px"></div>
+          <audio id="m-audio" controls style="width:100%;margin-top:10px" preload="none"></audio>
+        </div>
+
+        <div class="ua-card" style="margin-top:12px">
+          <b>📚 漫画 / 小说阅读（粘贴公开网页链接，本机提取内容）</b>
+          <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
+            <input id="m-book-url" class="input" placeholder="小说/文章页 URL（提取正文阅读）" style="flex:1;min-width:260px">
+            <button class="btn btn-primary btn-sm" onclick="mBookLoad()">读正文</button>
+          </div>
+          <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap;align-items:center">
+            <input id="m-comic-url" class="input" placeholder="漫画/图集页 URL（提取图片翻页）" style="flex:1;min-width:260px">
+            <button class="btn btn-primary btn-sm" onclick="mComicLoad()">看图</button>
+            <span id="m-comic-nav" style="font-size:12px;color:var(--text2)"></span>
+          </div>
+          <div style="display:flex;gap:6px;margin-top:8px;align-items:center">
+            <b id="m-read-title" style="font-size:13px;flex:1;word-break:break-all"></b>
+            <button class="btn btn-ghost btn-sm" onclick="mFont(-1)">A−</button>
+            <button class="btn btn-ghost btn-sm" onclick="mFont(1)">A＋</button>
+            <button class="btn btn-ghost btn-sm" onclick="mComicPrev()">◀ 上一页</button>
+            <button class="btn btn-ghost btn-sm" onclick="mComicNext()">下一页 ▶</button>
+          </div>
+          <div id="m-read-body" style="margin-top:8px;max-height:70vh;overflow:auto;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:14px;white-space:pre-wrap;line-height:1.9;font-size:15px"></div>
+        </div>
+      </div>
+    </section>
     <!-- 应用搭建器 -->
     <section id="view-downloads" class="hidden">
       <div class="ua-wrap">
@@ -730,8 +767,8 @@ function stars(n){return n>=1000?(n/1000).toFixed(1)+"k":n;}
 /* 视图切换 */
 function show(view){
   $$(".nav-item").forEach(i=>i.classList.toggle("active",i.dataset.view===view));
-  ["search","audit","deploy","pack","settings","flow","downloads","app"].forEach(v=>$("#view-"+v).classList.toggle("hidden",v!==view));
-  const titles={search:"项目搜索",audit:"合规审核中心",deploy:"我的部署",pack:"环境打包",settings:"设置",flow:"网址分析",downloads:"下载资源",app:"应用搭建器"};
+  ["search","audit","deploy","pack","settings","flow","media","downloads","app"].forEach(v=>$("#view-"+v).classList.toggle("hidden",v!==view));
+  const titles={search:"项目搜索",audit:"合规审核中心",deploy:"我的部署",pack:"环境打包",settings:"设置",flow:"网址分析",media:"媒体中心",downloads:"下载资源",app:"应用搭建器"};
   $("#view-title").textContent=titles[view]||"";
   if(view==="deploy") renderDeploys();
   if(view==="downloads") dlRefresh();
@@ -2463,6 +2500,81 @@ function uaDlStartWith(u){
     $("#ua-vurl").value=old;
   } else { toast("下载模块未就绪"); }
 }
+
+
+/* ===== 媒体中心 · 音乐 ===== */
+let mTmp=null, mItems=[];
+async function mSearch(){
+  const q=$("#m-q").value.trim();
+  if(!q){toast("请输入歌名/歌手");return;}
+  const box=$("#m-results");
+  box.innerHTML='<span style="color:var(--text2);font-size:12px">搜索中…</span>';
+  const r=await api("video/search",{q:q});
+  if(!r.ok){box.innerHTML='<span style="color:#e07b7b;font-size:12px">'+(r.error||"搜索失败")+'</span>';return;}
+  mItems=r.items||[];
+  box.innerHTML=(mItems.length?("找到 "+mItems.length+" 条公开内容（来源："+(r.sources||[]).join("/")+"）"):"无结果")+
+    mItems.map((it,i)=>'<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:6px 8px;border-bottom:1px solid var(--line)">'+
+      '<span style="font-size:13px;flex:1;word-break:break-all">'+esc(it.title)+'<span style="color:var(--text2);font-size:11px"> · '+esc(it.author||"-")+' · '+esc(it.duration||"-")+'</span></span>'+
+      '<button class="btn btn-sm" style="border-color:#4fd08a;color:#4fd08a" onclick="mPlay('+i+')">▶ 播放</button></div>').join("");
+}
+async function mPlay(i){
+  const it=(mItems||[])[i]; if(!it)return;
+  const a=$("#m-audio"); a.pause();
+  if(mTmp){api("url/play_clean",{path:mTmp}).then(()=>{});mTmp=null;}
+  toast("正在准备播放…（完整拉取，不保留文件）");
+  const r=await apiPost("url/play_prep",{url:it.url});
+  if(!r.ok){toast(r.error||"准备失败");return;}
+  const tid=r.task_id;
+  const t0=Date.now();
+  const iv=setInterval(async()=>{
+    const p=await api("url/play_progress",{task_id:tid});
+    if(!p.ok){clearInterval(iv);toast(p.error||"任务异常");return;}
+    if(p.done){
+      clearInterval(iv);
+      if(p.error){toast(p.error||"该内容无法播放（可能需登录或会员）");return;}
+      mTmp=p.path;
+      a.src="api/url/preview?path="+encodeURIComponent(p.path);
+      a.play().catch(()=>{});
+      a.onended=()=>{ if(mTmp){api("url/play_clean",{path:mTmp}).then(()=>{});mTmp=null;toast("播放结束，临时文件已清理");} };
+      return;
+    }
+  },600);
+}
+function mFont(d){const el=$("#m-read-body");let s=parseInt(el.style.fontSize||15)+d*1;el.style.fontSize=Math.max(12,Math.min(26,s))+"px";}
+
+/* ===== 媒体中心 · 小说/漫画 ===== */
+let mComicImgs=[], mComicIdx=0, mFontSz=15;
+async function mBookLoad(){
+  const u=$("#m-book-url").value.trim();
+  if(!/^https?:\/\//i.test(u)){toast("请粘贴 http(s):// 链接");return;}
+  $("#m-read-body").textContent="正在提取正文…";
+  const r=await apiPost("media/article",{url:u});
+  if(!r.ok){$("#m-read-body").textContent=r.error||"提取失败";return;}
+  $("#m-read-title").textContent=r.title+"（约 "+r.chars+" 字）";
+  $("#m-comic-nav").textContent="";
+  $("#m-read-body").style.whiteSpace="pre-wrap";
+  $("#m-read-body").textContent=r.text.join("\n\n");
+}
+async function mComicLoad(){
+  const u=$("#m-comic-url").value.trim();
+  if(!/^https?:\/\//i.test(u)){toast("请粘贴 http(s):// 链接");return;}
+  $("#m-read-body").textContent="正在提取图片…";
+  const r=await apiPost("media/manga",{url:u});
+  if(!r.ok){$("#m-read-body").textContent=r.error||"提取失败";return;}
+  mComicImgs=r.images||[]; mComicIdx=0;
+  $("#m-read-title").textContent=r.title+"（共 "+mComicImgs.length+" 页）";
+  mComicShow();
+}
+function mComicShow(){
+  if(!mComicImgs.length)return;
+  const el=$("#m-read-body");
+  el.style.whiteSpace="normal";
+  el.innerHTML='<img src="'+esc(mComicImgs[mComicIdx])+'" style="max-width:100%;border-radius:6px;display:block;margin:0 auto" onerror="mComicErr(this)">';
+  $("#m-comic-nav").textContent="第 "+(mComicIdx+1)+" / "+mComicImgs.length+" 页";
+}
+function mComicErr(img){img.outerHTML='<span style="color:#e07b7b;font-size:12px">图片加载失败（可能防盗链）</span>';}
+function mComicPrev(){if(mComicIdx>0){mComicIdx--;mComicShow();}}
+function mComicNext(){if(mComicIdx<mComicImgs.length-1){mComicIdx++;mComicShow();}}
 
 </script>
 <!-- 直接播放弹层 -->
