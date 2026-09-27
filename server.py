@@ -1770,6 +1770,54 @@ def _extract_images(html, base_url):
     return out
 
 
+
+def api_media_episodes(params):
+    """选集/分P：kind=bangumi 传 season_id（番剧分集）；kind=video 传 bvid（视频分P）
+    返回 episodes: [{index, title, dur, url}]"""
+    kind = str(params.get("kind") or "")
+    hd = {"User-Agent": (_DL_UA_POOL[0] if isinstance(_DL_UA_POOL, list) and _DL_UA_POOL else "Mozilla/5.0"),
+          "Referer": "https://www.bilibili.com/", "Accept-Encoding": "gzip, deflate"}
+    eps = []
+    try:
+        if kind == "bangumi":
+            sid = str(params.get("season_id") or "")
+            if not sid:
+                return {"ok": False, "error": "缺少 season_id"}
+            txt = _fetch_page("https://api.bilibili.com/pgc/view/web/season?season_id=" + sid)
+            d = json.loads(txt)
+            res = d.get("result") or {}
+            for e in (res.get("episodes") or []):
+                epid = e.get("id") or ""
+                dur = e.get("duration") or 0
+                try:
+                    dur = int(dur) // 1000
+                except Exception:
+                    dur = 0
+                dur_txt = (str(dur // 60) + ":" + str(dur % 60).zfill(2)) if dur else ""
+                eps.append({"index": e.get("title") or str(epid), "title": e.get("long_title") or e.get("title") or "",
+                            "dur": dur_txt, "url": ("https://www.bilibili.com/bangumi/play/ep" + str(epid)) if epid else ""})
+        elif kind == "video":
+            bv = str(params.get("bvid") or "")
+            if not bv:
+                return {"ok": False, "error": "缺少 bvid"}
+            html = _fetch_page("https://www.bilibili.com/video/" + bv)
+            m = re.search(r'"pages":(\[.*?\])(?=[,}])', html, re.S)
+            if not m:
+                return {"ok": False, "error": "该视频无分P（单集视频）"}
+            pages = json.loads(m.group(1))
+            for pg in pages[:50]:
+                dur = pg.get("duration") or 0
+                dur_txt = (str(int(dur) // 60) + ":" + str(int(dur) % 60).zfill(2)) if dur else ""
+                n = pg.get("page") or 0
+                eps.append({"index": "P" + str(n), "title": pg.get("part") or "",
+                            "dur": dur_txt, "url": ("https://www.bilibili.com/video/" + bv + ("?p=" + str(n) if n and n > 1 else ""))})
+    except Exception as e:
+        return {"ok": False, "error": str(e)[:150]}
+    if not eps:
+        return {"ok": False, "error": "未获取到分集（可能需要登录）"}
+    return {"ok": True, "episodes": eps, "total": len(eps)}
+
+
 def api_media_article(params):
     """POST {url} → 提取网页正文（小说/文章阅读）"""
     u = str(params.get("url") or "").strip()
@@ -3229,6 +3277,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(200, json.dumps(api_url_download(body), ensure_ascii=False).encode("utf-8"))
             if parsed.path == "/api/url/dl_video":
                 return self._send(200, json.dumps(api_url_dl_video(body), ensure_ascii=False).encode("utf-8"))
+            if parsed.path == "/api/media/episodes":
+                return self._send(200, json.dumps(api_media_episodes(body), ensure_ascii=False).encode("utf-8"))
             if parsed.path == "/api/media/article":
                 return self._send(200, json.dumps(api_media_article(body), ensure_ascii=False).encode("utf-8"))
             if parsed.path == "/api/media/manga":

@@ -2562,7 +2562,9 @@ function uaVRender(){
         '<div style="display:flex;gap:6px;margin-top:6px">'+
         '<button class="btn btn-sm" style="border-color:#4fd08a;color:#4fd08a" onclick="uaVPlay('+gi+')">▶ 播放</button>'+
         '<button class="btn btn-sm" style="border-color:var(--accent);color:var(--accent)" onclick="uaVDl('+gi+')">下载</button>'+
-        '</div></div>';
+        (it.kind==="bangumi"?('<button class="btn btn-sm" style="border-color:#d0a64f;color:#d0a64f" onclick="uaVEps('+gi+')">选集</button>'):'')+
+        (it.kind==="video"?('<button class="btn btn-sm" style="border-color:#d0a64f;color:#d0a64f" onclick="uaVEps('+gi+')">分P</button>'):'')+
+        '</div><div id="ua-eps-'+gi+'" style="display:none;margin-top:6px"></div></div>';
     });
     html+='</div>';
   });
@@ -2570,6 +2572,44 @@ function uaVRender(){
   // 记录来源信息
   if(window._uaVLastR && window._uaVLastR.sources){window._uaVSourceInfo="（来源："+window._uaVLastR.sources.join(" / ")+"）";}
 }
+async function uaVEps(i){
+  const it=(window._uaVItems||[])[i]; if(!it)return;
+  const box=$("#ua-eps-"+i);
+  if(box.style.display!=="none" && box.dataset.loaded){box.style.display=box.style.display==="none"?"block":"none";return;}
+  box.style.display="block";
+  box.innerHTML='<span style="color:var(--text2);font-size:12px">加载分集…</span>';
+  let r;
+  if(it.kind==="bangumi"){
+    const sid=(it.url||"").match(/bangumi\/play\/ss(\d+)/);
+    r=await apiPost("media/episodes",{kind:"bangumi",season_id:sid?sid[1]:""});
+  } else {
+    const bv=(it.url||"").match(/video\/(BV[0-9A-Za-z]+)/);
+    r=await apiPost("media/episodes",{kind:"video",bvid:bv?bv[1]:""});
+  }
+  if(!r.ok){box.innerHTML='<span style="color:#e07b7b;font-size:12px">'+(r.error||"获取失败")+'</span>';return;}
+  const eps=r.episodes||[];
+  if(!eps.length){box.innerHTML='<span style="color:var(--text2);font-size:12px">无分集</span>';return;}
+  box.dataset.loaded="1";
+  box.innerHTML='<div style="border:1px solid var(--line);border-radius:6px;padding:6px;max-height:260px;overflow:auto">'+
+    '<div style="font-size:12px;color:var(--text2);margin-bottom:4px">共 '+r.total+' 集</div>'+
+    eps.map((e,ei)=>'<div style="display:flex;align-items:center;gap:6px;padding:4px 2px;border-bottom:1px solid #ffffff0d;font-size:12px">'+
+      '<span style="color:var(--accent);flex:none;width:34px">'+esc(e.index)+'</span>'+
+      '<span style="flex:1;word-break:break-all;color:var(--text)">'+esc(e.title)+'</span>'+
+      '<span style="color:var(--text2);flex:none">'+esc(e.dur||"")+'</span>'+
+      '<button class="btn btn-sm" style="border-color:#4fd08a;color:#4fd08a" onclick="uaVPlayUrl(\''+esc(e.url)+'\',\''+esc(e.index+" "+e.title)+'\')">▶</button>'+
+      '<button class="btn btn-sm" style="border-color:var(--accent);color:var(--accent)" onclick="uaVDlUrl(\''+esc(e.url)+'\')">↓</button></div>').join("")+'</div>';
+}
+function uaVPlayUrl(url,title){
+  if(!url){toast("无播放地址");return;}
+  if(window._uaSecLevel==="danger"){toast("危险站点已禁止");return;}
+  uaPlayPrep(url,title||"选集播放");
+}
+function uaVDlUrl(url){
+  if(!url){toast("无下载地址");return;}
+  toast("提交下载…");
+  uaDlStartWith(url);
+}
+
 function uaVQ(t){$("#ua-vq").value=t;uaVSearch();}
 function uaVPlay(i){
   const it=(window._uaVItems||[])[i]; if(!it)return;
