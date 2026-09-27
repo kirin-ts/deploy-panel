@@ -426,6 +426,7 @@ input:focus,textarea:focus{outline:none;border-color:var(--accent)}
               <input id="ua-vurl" class="input" placeholder="粘贴任意 http(s):// 地址，如视频、图片、压缩包…" style="flex:1">
               <button class="btn btn-primary btn-sm" onclick="uaDlStart()">一键下载</button>
               <button class="btn btn-sm" onclick="uaDlStart(true)" style="border-color:var(--accent);color:var(--accent)" title="用 yt-dlp 解析任意平台（B站/微博/快手/YouTube 等），需已安装 yt-dlp">通用(yt-dlp)</button>
+              <button class="btn btn-sm" onclick="uaPlay()" style="border-color:#4fd08a;color:#4fd08a" title="提取直链后在本面板内直接播放（不下载文件，无广告/弹窗；仅公开视频）">▶ 直接播放</button>
             </div>
             <div id="ua-vlist" style="margin-top:6px;display:flex;flex-direction:column;gap:4px"></div>
             <div id="ua-prog" class="hidden" style="margin-top:8px;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 10px">
@@ -2369,6 +2370,34 @@ setTimeout(uaLoadFiles,600);
 /* 积木工作室已下线：loadBlocks(); */
 
 show("search");
+
+async function uaPlay(){
+  const v=$("#ua-vurl").value.trim();
+  if(!/^https?:\/\//i.test(v)){toast("请粘贴 http(s):// 视频链接");return;}
+  if(window._uaSecLevel==="danger"){toast("危险站点已禁止");return;}
+  toast("正在提取直链…（约 5-15 秒）");
+  const r=await api("url/playinfo",{url:v});
+  if(!r.ok){toast(r.error||"解析失败");return;}
+  $("#ua-play-title").textContent=r.title+(r.height?(" · "+r.height+"p"):"");
+  $("#ua-play-video").src="api/url/play?url="+encodeURIComponent(r.url)+"&ref="+encodeURIComponent(v);
+  $("#ua-play-mask").classList.remove("hidden");
+  const pv=$("#ua-play-video");
+  pv.play().catch(()=>{});
+}
+function uaPlayClose(){
+  const pv=$("#ua-play-video"); pv.pause(); pv.removeAttribute("src"); pv.load();
+  $("#ua-play-mask").classList.add("hidden");
+}
+
 </script>
+<!-- 直接播放弹层 -->
+<div id="ua-play-mask" class="hidden" style="position:fixed;inset:0;background:#000c;z-index:999;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px">
+  <div style="width:min(94vw,1080px);color:#fff;font-size:14px;display:flex;justify-content:space-between;align-items:center">
+    <span id="ua-play-title" style="word-break:break-all;max-width:80%"></span>
+    <button class="btn btn-sm" onclick="uaPlayClose()" style="border-color:#fff6;color:#fff">关闭</button>
+  </div>
+  <video id="ua-play-video" controls autoplay style="width:min(94vw,1080px);max-height:78vh;background:#000;border-radius:8px"></video>
+  <div style="color:#fff8;font-size:12px">公开视频直接播放 · 无广告/弹窗 · 不产生文件 · VIP/会员内容不支持</div>
+</div>
 </body>
 </html>
