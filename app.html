@@ -475,7 +475,7 @@ input:focus,textarea:focus{outline:none;border-color:var(--accent)}
           <button class="btn btn-sm mt-tab-btn" data-tab="book" onclick="mtTab('book',this)">漫画 / 小说</button>
           <span style="flex:1"></span>
           <span style="font-size:11px;color:var(--text2)">仅公开/免费内容 · 付费会员内容不索引</span>
-          <button id="ua-filter-btn" class="btn btn-ghost btn-sm" onclick="uaToggleFilter()" style="font-size:11px;margin-left:6px" title="内容过滤开关：开=只显示免费公开视频；关=调试模式显示全部搜索结果">过滤：…</button>
+          <button id="ua-filter-btn" class="btn btn-ghost btn-sm" onclick="uaToggleFilter()" style="font-size:11px;margin-left:6px" title="内容过滤开关：开=黑白名单全部生效（可屏蔽/放行指定网站）；关=调试模式，黑白名单不生效，显示全部搜索结果">过滤：…</button>
           <button class="btn btn-ghost btn-sm" onclick="uaOpenFilterCfg()" style="font-size:11px;margin-left:4px" title="编辑过滤黑白名单，全部由你掌控">过滤配置</button>
         </div>
         <div id="mt-panel-video">
@@ -779,7 +779,7 @@ input:focus,textarea:focus{outline:none;border-color:var(--accent)}
       <span style="flex:1"></span>
       <button class="btn btn-sm" onclick="uaCloseFilterCfg()">关闭</button>
     </div>
-    <div style="font-size:12px;color:var(--text2);margin-bottom:10px;line-height:1.6">正版/盗版与全部过滤口径均由你掌控：点 × 删除条目，输入后回车或点「添加」新增。改动即时保存、下次搜索立即生效。<b style="color:var(--warn,#d97706)">「非授权/盗版影视站黑名单」默认过滤盗版聚合站，删除其中条目即表示你放行该站——播放盗版内容的法律风险由你自行承担；付费平台黑名单同理，移除后付费内容将出现但其播放需会员。</b></div>
+    <div style="font-size:12px;color:var(--text2);margin-bottom:10px;line-height:1.6">正版/盗版与全部过滤口径均由你掌控：点 × 删除条目，输入后回车或点「添加」新增。改动即时保存、下次搜索立即生效。<b style="color:var(--warn,#d97706)">「非授权/盗版影视站黑名单」默认过滤盗版聚合站，删除其中条目即表示你放行该站——播放盗版内容的法律风险由你自行承担；付费平台黑名单同理，移除后付费内容将出现但其播放需会员。</b><br><span style="color:var(--accent)">空名单语义：黑名单为空=不屏蔽任何网站；白名单（免费视频平台）为空=全部放行。请勿把「过滤：关」当名单失效——调试模式下黑白名单不生效，需先切回「过滤：开」再测试名单效果。</span></div>
     <div id="ua-fg-body" style="display:flex;flex-direction:column;gap:10px"></div>
   </div>
 </div>

@@ -49,7 +49,30 @@
     "下载文档",
     "小说"
   ],
-  "video_doms": [],
+  "video_doms": [
+    "douyin.com",
+    "ixigua.com",
+    "weibo.com",
+    "kuaishou.com",
+    "acfun.cn",
+    "pearvideo.com",
+    "1905.com",
+    "tv.cctv.com",
+    "jishi.cctv.com",
+    "tv.cctv.cn",
+    "yangshipin.cn",
+    "open.163.com",
+    "icourse163.org",
+    "w3school.com.cn",
+    "runoob.com",
+    "geekbang.org",
+    "study.163.com",
+    "youtube.com",
+    "sohu.com",
+    "v.qq.com",
+    "iqiyi.com",
+    "bilibili.com"
+  ],
   "paid_doms": [
     "v.qq.com",
     "iqiyi.com",
@@ -113,5 +136,21 @@
     "yangshipin.cn",
     "tv.cctv.cn"
   ],
-  "pirate_doms": []
+  "pirate_doms": [
+    "btbtdy.com",
+    "btbtdy.cc",
+    "dy2018.com",
+    "dytt8.net",
+    "dytt89.com",
+    "80s.tw",
+    "80s.la",
+    "okzyw.com",
+    "1080zyk.com",
+    "zxzj.pro",
+    "66s.cc",
+    "nfmovies.com",
+    "tvb123.com",
+    "qq7799.com",
+    "5dianying.com"
+  ]
 }
