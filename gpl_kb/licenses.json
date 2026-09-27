@@ -1,0 +1,272 @@
+{
+  "licenses": [
+    {
+      "id": "GPL-3.0",
+      "aliases": ["gpl-3.0", "gpl3", "gnu general public license v3", "gplv3"],
+      "zh_name": "GNU 通用公共许可证 v3",
+      "type": "copyleft",
+      "strength": "strong",
+      "open_source": true,
+      "can_modify": true,
+      "can_commercial": true,
+      "can_close": false,
+      "must_provide_source": true,
+      "saas_free": true,
+      "obligations": [
+        "修改后的整个衍生作品必须继续以 GPL v3 开源",
+        "分发时必须随附对应源代码（含构建脚本与依赖）",
+        "必须保留全部版权声明与许可证文本",
+        "修改过的文件须显著标注修改事实",
+        "不得向接收者施加额外限制（如禁止商用条款）",
+        "知悉相关专利须披露；对行使权利者提起专利诉讼将导致许可终止"
+      ],
+      "risk": "high_if_redistribute",
+      "risk_note": "自用合规；一旦分发（含交付给客户/上架），必须开源并提供源码",
+      "compatible_with": ["GPL-3.0", "GPL-3.0-or-later", "Apache-2.0(可并入)", "MIT/BSD(可并入)"],
+      "notes": "官方文本：https://www.gnu.org/licenses/gpl-3.0.html"
+    },
+    {
+      "id": "GPL-2.0",
+      "aliases": ["gpl-2.0", "gpl2", "gnu general public license v2", "gplv2"],
+      "zh_name": "GNU 通用公共许可证 v2",
+      "type": "copyleft",
+      "strength": "strong",
+      "open_source": true,
+      "can_modify": true,
+      "can_commercial": true,
+      "can_close": false,
+      "must_provide_source": true,
+      "saas_free": true,
+      "obligations": [
+        "修改后的衍生作品必须继续以 GPL v2 开源",
+        "分发时必须随附源代码",
+        "保留版权声明与许可证文本",
+        "修改文件须注明修改事实",
+        "v2 无明确专利条款；违规即永久终止（无 v3 的 30 天补救）",
+        "GPL-2.0-only 代码不能并入仅 GPL-3.0 的项目"
+      ],
+      "risk": "high_if_redistribute",
+      "risk_note": "与 v3 不兼容（only 情形）；分发义务同 v3",
+      "compatible_with": ["GPL-2.0", "GPL-2.0-or-later(可升级v3)"],
+      "notes": "官方文本：https://www.gnu.org/licenses/old-licenses/gpl-2.0.html"
+    },
+    {
+      "id": "AGPL-3.0",
+      "aliases": ["agpl-3.0", "agpl3", "affero gpl v3"],
+      "zh_name": "GNU Affero 通用公共许可证 v3",
+      "type": "copyleft",
+      "strength": "strong_network",
+      "open_source": true,
+      "can_modify": true,
+      "can_commercial": true,
+      "can_close": false,
+      "must_provide_source": true,
+      "saas_free": false,
+      "obligations": [
+        "copyleft 义务同 GPL v3",
+        "【SaaS 关键】通过网络提供远程交互服务时，必须把修改后的完整源码提供给所有远程用户（§13）",
+        "分发义务同 GPL v3（源码、声明、修改标注）"
+      ],
+      "risk": "high_if_saas",
+      "risk_note": "只要部署成在线服务（SaaS）就必须开源修改版源码，即使不分发安装包",
+      "compatible_with": ["AGPL-3.0", "GPL-3.0(组合后整体AGPL)"],
+      "notes": "官方文本：https://www.gnu.org/licenses/agpl-3.0.html"
+    },
+    {
+      "id": "LGPL-3.0",
+      "aliases": ["lgpl-3.0", "lgpl3", "gnu lesser gpl v3"],
+      "zh_name": "GNU 宽通用公共许可证 v3",
+      "type": "copyleft",
+      "strength": "weak",
+      "open_source": true,
+      "can_modify": true,
+      "can_commercial": true,
+      "can_close": true,
+      "must_provide_source": true,
+      "saas_free": true,
+      "obligations": [
+        "库本身及其修改必须保持 LGPL 开源",
+        "【闭源关键】与库动态链接的独立程序可以闭源分发",
+        "静态链接进闭源程序时，须提供可重链接的库目标文件，允许用户替换库版本",
+        "分发时保留声明并注明使用了 LGPL 库"
+      ],
+      "risk": "medium_if_link",
+      "risk_note": "动态链接可闭源；静态链接需满足可替换条款",
+      "compatible_with": ["LGPL-3.0", "GPL-3.0(库可并入GPL项目)"],
+      "notes": "官方文本：https://www.gnu.org/licenses/lgpl-3.0.html"
+    },
+    {
+      "id": "MIT",
+      "aliases": ["mit", "mit license"],
+      "zh_name": "MIT 许可证",
+      "type": "permissive",
+      "strength": "none",
+      "open_source": true,
+      "can_modify": true,
+      "can_commercial": true,
+      "can_close": true,
+      "must_provide_source": false,
+      "saas_free": true,
+      "obligations": [
+        "保留版权声明与许可文本（必须随副本一起提供）",
+        "无开源义务、无源码提供义务"
+      ],
+      "risk": "low",
+      "risk_note": "最宽松；唯一义务是保留版权声明",
+      "compatible_with": ["任意"],
+      "notes": "官方文本：https://opensource.org/license/mit"
+    },
+    {
+      "id": "Apache-2.0",
+      "aliases": ["apache-2.0", "apache2", "apache license 2.0"],
+      "zh_name": "Apache 许可证 2.0",
+      "type": "permissive",
+      "strength": "none",
+      "open_source": true,
+      "can_modify": true,
+      "can_commercial": true,
+      "can_close": true,
+      "must_provide_source": false,
+      "saas_free": true,
+      "obligations": [
+        "保留版权声明与许可文本",
+        "显著说明修改内容（NOTICE 文件）",
+        "保留专利授权声明；不得撤诉专利",
+        "无开源义务"
+      ],
+      "risk": "low",
+      "risk_note": "宽松且带明确专利授权，与 GPL v3 兼容（可并入 GPL v3 项目）",
+      "compatible_with": ["任意", "GPL-3.0(可并入)"],
+      "notes": "官方文本：https://www.apache.org/licenses/LICENSE-2.0"
+    },
+    {
+      "id": "BSD-3-Clause",
+      "aliases": ["bsd-3-clause", "bsd3", "bsd license", "new bsd"],
+      "zh_name": "BSD 三条款许可证",
+      "type": "permissive",
+      "strength": "none",
+      "open_source": true,
+      "can_modify": true,
+      "can_commercial": true,
+      "can_close": true,
+      "must_provide_source": false,
+      "saas_free": true,
+      "obligations": [
+        "保留版权声明",
+        "不得以作者名义背书衍生品（广告条款已废弃）"
+      ],
+      "risk": "low",
+      "risk_note": "宽松；唯一义务是保留声明",
+      "compatible_with": ["任意"],
+      "notes": "官方文本：https://opensource.org/license/bsd-3-clause"
+    },
+    {
+      "id": "MPL-2.0",
+      "aliases": ["mpl-2.0", "mpl2", "mozilla public license 2.0"],
+      "zh_name": "Mozilla 公共许可证 2.0",
+      "type": "copyleft",
+      "strength": "weak_file",
+      "open_source": true,
+      "can_modify": true,
+      "can_commercial": true,
+      "can_close": true,
+      "must_provide_source": true,
+      "saas_free": true,
+      "obligations": [
+        "被修改的文件本身须以 MPL 提供源码",
+        "未修改的其他文件可保持闭源（文件级 copyleft）",
+        "保留版权声明与 MPL 文本"
+      ],
+      "risk": "medium_if_file_modify",
+      "risk_note": "文件级 copyleft：改哪个文件，哪个文件须开源",
+      "compatible_with": ["任意", "可并入GPL项目"],
+      "notes": "官方文本：https://www.mozilla.org/MPL/2.0/"
+    },
+    {
+      "id": "CC0-1.0",
+      "aliases": ["cc0-1.0", "cc0", "creative commons zero"],
+      "zh_name": "知识共享零版权声明",
+      "type": "public_domain",
+      "strength": "none",
+      "open_source": true,
+      "can_modify": true,
+      "can_commercial": true,
+      "can_close": true,
+      "must_provide_source": false,
+      "saas_free": true,
+      "obligations": [],
+      "risk": "low",
+      "risk_note": "放弃全部版权（部分地区有保留），可任意使用",
+      "compatible_with": ["任意"],
+      "notes": "官方文本：https://creativecommons.org/publicdomain/zero/1.0/"
+    },
+    {
+      "id": "UNLICENSED",
+      "aliases": ["unlicensed", "no license", "none", ""],
+      "zh_name": "未声明许可证",
+      "type": "proprietary",
+      "strength": "all_rights_reserved",
+      "open_source": false,
+      "can_modify": false,
+      "can_commercial": false,
+      "can_close": true,
+      "must_provide_source": false,
+      "saas_free": false,
+      "obligations": [
+        "未声明许可证=默认保留全部权利（all rights reserved）",
+        "无授权即不得复制、修改、分发、商用",
+        "即使 GitHub 公开了代码，也仅限查看；使用需先联系作者获得授权"
+      ],
+      "risk": "high",
+      "risk_note": "没有许可证不是'免费'，而是'禁止使用'——最常见的新手法律陷阱",
+      "compatible_with": [],
+      "notes": "GitHub 官方说明：无 LICENSE 的公共仓库代码默认受版权法保护"
+    },
+    {
+      "id": "Proprietary",
+      "aliases": ["proprietary", "commercial", "closed source", "专有", "商业"],
+      "zh_name": "专有/闭源许可证",
+      "type": "proprietary",
+      "strength": "all_rights_reserved",
+      "open_source": false,
+      "can_modify": false,
+      "can_commercial": false,
+      "can_close": true,
+      "must_provide_source": false,
+      "saas_free": false,
+      "obligations": [
+        "未经授权不得使用、复制、修改、分发",
+        "需购买授权或获得书面许可"
+      ],
+      "risk": "high",
+      "risk_note": "仅可查看学习，任何形式的使用都可能侵权",
+      "compatible_with": [],
+      "notes": "以仓库声明为准"
+    },
+    {
+      "id": "UNKNOWN",
+      "aliases": [],
+      "zh_name": "无法识别",
+      "type": "unknown",
+      "strength": "unknown",
+      "open_source": null,
+      "can_modify": null,
+      "can_commercial": null,
+      "can_close": null,
+      "must_provide_source": null,
+      "saas_free": null,
+      "obligations": [
+        "无法自动识别许可证，需人工核查 LICENSE 文件或联系作者",
+        "在确认前默认按'未授权'谨慎处理，不部署、不商用"
+      ],
+      "risk": "high",
+      "risk_note": "识别失败时强制进入人工审核，避免误用",
+      "compatible_with": [],
+      "notes": "建议联网重试或手动粘贴 LICENSE 文本"
+    }
+  ],
+  "gpl_family_trigger": {
+    "zh": "命中 GPL 家族（GPL-2.0/GPL-3.0/LGPL/AGPL）时，强制进入 GPL 律师合规审核流程",
+    "rule": "license.type == 'copyleft' 或 'strong_network' 即触发"
+  }
+}

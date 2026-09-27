@@ -1,0 +1,654 @@
+# ---------- 应用搭建器（可视化搭前后端） ----------
+import html as _html
+COMPONENTS_BUILTIN = load_json(os.path.join(DATA, "components_builtin.json"), {}).get("components", [])
+COMPONENTS_CUSTOM_FILE = os.path.join(DATA, "components_custom.json")
+APPS_DIR = os.path.join(DATA, "apps")
+APPS_RUNTIME = os.path.join(DATA, "apps_runtime.json")
+APPS_WORK = os.path.join(WORKSPACES, "apps")
+os.makedirs(APPS_DIR, exist_ok=True)
+os.makedirs(APPS_WORK, exist_ok=True)
+UPLOADS = os.path.join(DATA, "uploads")
+os.makedirs(UPLOADS, exist_ok=True)
+
+def load_custom_components():
+    return load_json(COMPONENTS_CUSTOM_FILE, {}).get("components", [])
+
+def all_components():
+    merged = {}
+    for c in COMPONENTS_BUILTIN:
+        merged[c["id"]] = dict(c)
+    for c in load_custom_components():
+        merged[c["id"]] = dict(c)
+    return merged
+
+def api_app_components(params):
+    return {"ok": True, "components": list(all_components().values())}
+
+def api_app_comp_save(params):
+    try:
+        data = json.loads(params.get("data", "{}"))
+    except Exception:
+        return {"ok": False, "error": "组件 JSON 解析失败"}
+    if not isinstance(data, dict):
+        return {"ok": False, "error": "组件数据格式错误"}
+    cid = str(data.get("id", "")).strip()
+    if not cid or not re.match(r"^[\w\u4e00-\u9fa5-]+$", cid):
+        return {"ok": False, "error": "组件 id 不能为空且只能含中文/字母/数字/下划线/短横线"}
+    if not str(data.get("name", "")).strip():
+        return {"ok": False, "error": "组件名称必填"}
+    props = data.get("props", [])
+    if not isinstance(props, list):
+        return {"ok": False, "error": "属性定义需为 JSON 数组"}
+    for pp in props:
+        if not isinstance(pp, dict) or not str(pp.get("key", "")).strip():
+            return {"ok": False, "error": "属性 key 必填（[{\"key\":\"text\",...}]）"}
+    comp = {
+        "id": cid,
+        "name": str(data.get("name", "")).strip(),
+        "category": str(data.get("category", "自定义")).strip() or "自定义",
+        "desc": str(data.get("desc", "")).strip(),
+        "color": str(data.get("color", "#5b6472")).strip() or "#5b6472",
+        "props": props,
+        "html": str(data.get("html", "")),
+        "css": str(data.get("css", "")),
+    }
+    cur = load_custom_components()
+    cur = [c for c in cur if c.get("id") != cid]
+    cur.append(comp)
+    save_json(COMPONENTS_CUSTOM_FILE, {"components": cur})
+    return {"ok": True}
+
+def api_app_comp_delete(params):
+    cid = str(params.get("id", "")).strip()
+    if not cid:
+        return {"ok": False, "error": "缺组件 id"}
+    cur = load_custom_components()
+    n = len(cur)
+    cur = [c for c in cur if c.get("id") != cid]
+    if len(cur) == n:
+        return {"ok": False, "error": "该组件未被自定义过，无需删除"}
+    save_json(COMPONENTS_CUSTOM_FILE, {"components": cur})
+    return {"ok": True}
+
+def render_comp_html(cdef, props, close=True):
+    tpl = cdef.get("html", "")
+    defs = {p2.get("key"): p2.get("default", "") for p2 in cdef.get("props", [])}
+    imgs = {p2.get("key"): p2 for p2 in cdef.get("props", []) if p2.get("type") == "img"}
+    def repl(m):
+        key = m.group(1)
+        v = props.get(key, defs.get(key, ""))
+        if v is None:
+            v = ""
+        v = str(v)
+        if key in imgs:
+            if not v:
+                return ""
+            if imgs[key].get("as") == "img-tag":
+                return '<img class="dp-nav-logo" src="%s" alt="logo">' % _html.escape(v, quote=True)
+            return _html.escape(v, quote=True)
+        return _html.escape(v, quote=True)
+    inner = re.sub(r"\{(\w+)\}", repl, tpl)
+    st = {}
+    for k in ("align", "width", "border", "radius", "margin"):
+        st[k] = str(props.get(k, defs.get(k, "")))
+    wcls = "dp-wrap"
+    for k, prefix in (("align", "dp-a-"), ("width", "dp-w-"), ("border", "dp-b-"), ("radius", "dp-r-"), ("margin", "dp-m-")):
+        if st[k]:
+            wcls += " " + prefix + st[k]
+    return '<div class="%s">%s%s' % (wcls, inner, "</div>" if close else "")
+
+
+
+def api_app_save(params):
+    name = str(params.get("name", "")).strip()
+    if not name:
+        return {"ok": False, "error": "请填写应用名"}
+    safe = re.sub(r"[^\w\u4e00-\u9fa5-]", "_", name)
+    try:
+        comps = json.loads(params.get("data", "[]"))
+    except Exception:
+        return {"ok": False, "error": "页面数据格式错误"}
+    save_json(os.path.join(APPS_DIR, safe + ".json"), {"name": name, "components": comps})
+    return {"ok": True, "name": safe}
+
+def api_app_load(params):
+    name = params.get("name", "")
+    safe = re.sub(r"[^\w\u4e00-\u9fa5-]", "_", name)
+    p2 = os.path.join(APPS_DIR, safe + ".json")
+    if not os.path.exists(p2):
+        return {"ok": False, "error": "应用不存在"}
+    return {"ok": True, "app": load_json(p2, {})}
+
+def api_app_list(params):
+    names = []
+    if os.path.isdir(APPS_DIR):
+        for f in os.listdir(APPS_DIR):
+            if f.endswith(".json"):
+                names.append(f[:-5])
+    names.sort()
+    return {"ok": True, "apps": names}
+
+def api_app_delete(params):
+    name = params.get("name", "")
+    safe = re.sub(r"[^\w\u4e00-\u9fa5-]", "_", name)
+    p2 = os.path.join(APPS_DIR, safe + ".json")
+    if os.path.exists(p2):
+        os.remove(p2)
+        return {"ok": True, "deleted": True}
+    return {"ok": False, "error": "应用不存在"}
+
+def _collect_schema(comps, comp_index):
+    """遍历组件树，收集表结构 {table: [cols]}；返回 (tables, forms, lists, buttons)"""
+    tables = {}
+    forms = []
+    lists = []
+    buttons = []
+    def walk(items, form_ctx):
+        for it in items:
+            cid = it.get("compId")
+            if cid == "c_form":
+                tbl = str(it.get("props", {}).get("table", "users"))
+                new_ctx = {"table": tbl}
+                tables.setdefault(tbl, [])
+                walk(it.get("children", []), new_ctx)
+                forms.append({"table": tbl, "props": it.get("props", {})})
+            elif cid in ("c_input", "c_textarea"):
+                f = str(it.get("props", {}).get("field", "")).strip()
+                if f and re.match(r"^[A-Za-z_]\w*$", f):
+                    cur = tables.setdefault((form_ctx or {}).get("table", "users"), [])
+                    if f not in cur:
+                        cur.append(f)
+            elif cid == "c_list":
+                tbl = str(it.get("props", {}).get("table", "users"))
+                tables.setdefault(tbl, [])
+                lists.append(it)
+            elif cid == "c_button" and str(it.get("props", {}).get("action", "")) == "提交到数据表":
+                tbl = (form_ctx or {}).get("table") or str(it.get("props", {}).get("action_data", "users"))
+                tables.setdefault(tbl, [])
+                buttons.append({"props": it.get("props", {}), "table": tbl})
+            else:
+                walk(it.get("children", []), form_ctx)
+    walk(comps, None)
+    for tbl in list(tables.keys()):
+        if not tables[tbl]:
+            tables[tbl] = ["name", "message"]
+    return tables, forms, lists, buttons
+
+APP_PY_TEMPLATE = """# -*- coding: utf-8 -*-
+# 由 DeployPanel 应用搭建器生成 · {appname}
+import http.server, sqlite3, json, os, re, urllib.parse
+BASE = os.path.dirname(os.path.abspath(__file__))
+DB = os.path.join(BASE, "data.db")
+PORT = {port}
+TABLES = {tables!r}
+def db():
+    con = sqlite3.connect(DB); con.row_factory = sqlite3.Row; return con
+def init():
+    con = db()
+    for tbl, cols in TABLES.items():
+        if not re.match(r"^[A-Za-z_]\\w*$", tbl):
+            continue
+        cols2 = [c for c in cols if re.match(r"^[A-Za-z_]\\w*$", c)]
+        colsql = ", ".join("`%s` TEXT" % c for c in cols2)
+        con.execute("CREATE TABLE IF NOT EXISTS `%s` (id INTEGER PRIMARY KEY AUTOINCREMENT, %s, created_at TEXT DEFAULT (datetime('now','localtime')))" % (tbl, colsql))
+    con.commit(); con.close()
+class H(http.server.BaseHTTPRequestHandler):
+    def log_message(self, *a): pass
+    def _json(self, obj):
+        body = json.dumps(obj, ensure_ascii=False).encode("utf-8")
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers(); self.wfile.write(body)
+    def _page(self):
+        p2 = os.path.join(BASE, "templates", "index.html")
+        with open(p2, "rb") as f:
+            body = f.read()
+        self.send_response(200)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers(); self.wfile.write(body)
+    def _serve_asset(self, p):
+        fn = os.path.basename(p)
+        fp = os.path.join(BASE, "assets", fn)
+        if not os.path.exists(fp):
+            self._json({"ok": False, "error": "not found"})
+            return
+        with open(fp, "rb") as f:
+            body = f.read()
+        ext = os.path.splitext(fn)[1].lower()
+        ctype = {"png": "image/png", "jpg": "image/jpeg", "jpeg": "image/jpeg",
+                 "gif": "image/gif", "webp": "image/webp", "svg": "image/svg+xml"}.get(ext, "application/octet-stream")
+        self.send_response(200)
+        self.send_header("Content-Type", ctype)
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers(); self.wfile.write(body)
+    def do_GET(self):
+        pr = urllib.parse.urlparse(self.path)
+        if pr.path.startswith("/api/data/"):
+            tbl = pr.path[len("/api/data/"):]
+            if not re.match(r"^[A-Za-z_]\\w*$", tbl) or tbl not in TABLES:
+                self._json({"ok": False, "error": "表不存在"}); return
+            try:
+                con = db()
+                rows = con.execute("SELECT * FROM `%s` ORDER BY id DESC LIMIT 200" % tbl).fetchall()
+                con.close()
+                self._json({"ok": True, "rows": [dict(r) for r in rows]})
+            except Exception as e:
+                self._json({"ok": False, "error": str(e)})
+        if pr.path.startswith("/assets/"):
+            self._serve_asset(pr.path)
+            return
+        else:
+            self._page()
+    def do_POST(self):
+        pr = urllib.parse.urlparse(self.path)
+        if pr.path == "/api/_shutdown":
+            _SHUTDOWN[0] = True
+            self._json({"ok": True})
+            return
+        if pr.path.startswith("/api/data/"):
+            tbl = pr.path[len("/api/data/"):]
+            if not re.match(r"^[A-Za-z_]\\w*$", tbl) or tbl not in TABLES:
+                self._json({"ok": False, "error": "表不存在"}); return
+            try:
+                ln = int(self.headers.get("Content-Length", 0))
+                body = json.loads(self.rfile.read(ln).decode("utf-8")) if ln else {}
+                cols = [k for k in body.keys() if re.match(r"^[A-Za-z_]\\w*$", k) and k in TABLES[tbl]]
+                con = db()
+                if cols:
+                    q = "INSERT INTO `%s` (%s) VALUES (%s)" % (tbl, ",".join("`%s`" % c for c in cols), ",".join("?" * len(cols)))
+                    con.execute(q, [body[c] for c in cols])
+                con.commit(); con.close()
+                self._json({"ok": True})
+            except Exception as e:
+                self._json({"ok": False, "error": str(e)})
+        else:
+            self._page()
+_SHUTDOWN = [False]
+if __name__ == "__main__":
+    init()
+    srv = http.server.ThreadingHTTPServer(("127.0.0.1", PORT), H)
+    print("app running on http://127.0.0.1:%d" % PORT)
+    import threading, time as _t
+    def _watch():
+        while True:
+            _t.sleep(0.5)
+            if _SHUTDOWN[0]:
+                try:
+                    srv.shutdown()
+                except Exception:
+                    pass
+                return
+    threading.Thread(target=_watch, daemon=True).start()
+    srv.serve_forever()
+    print("app stopped")
+"""
+
+def api_app_generate(params):
+    name = str(params.get("name", "")).strip()
+    safe = re.sub(r"[^\w\u4e00-\u9fa5-]", "_", name)
+    p2 = os.path.join(APPS_DIR, safe + ".json")
+    if not os.path.exists(p2):
+        return {"ok": False, "error": "应用不存在，请先保存"}
+    app = load_json(p2, {})
+    comps = app.get("components", [])
+    cidx = all_components()
+    tables, forms, lists, buttons = _collect_schema(comps, cidx)
+
+    port = 8801
+    while port < 8899:
+        if not _port_in_use(port):
+            break
+        port += 1
+
+    out_dir = os.path.join(APPS_WORK, safe)
+    # img 类型属性：uploads/ 引用复制进应用 assets 并改写为 assets/
+    import shutil as _sh
+    def _asset_rewrite(items):
+        for it in items:
+            c = cidx.get(it.get("compId"))
+            if c:
+                for pp in c.get("props", []):
+                    if pp.get("type") == "img":
+                        k = pp.get("key")
+                        v = str(it.get("props", {}).get(k, ""))
+                        if v.startswith("uploads/"):
+                            src = os.path.join(UPLOADS, os.path.basename(v))
+                            if os.path.exists(src):
+                                adir = os.path.join(out_dir, "assets")
+                                os.makedirs(adir, exist_ok=True)
+                                dst = os.path.join(adir, os.path.basename(v))
+                                if not os.path.exists(dst):
+                                    _sh.copy2(src, dst)
+                                it.setdefault("props", {})[k] = "assets/" + os.path.basename(v)
+            _asset_rewrite(it.get("children", []))
+    _asset_rewrite(comps)
+
+    css_parts, html_parts = [], []
+    def walk(items):
+        for it in items:
+            c = cidx.get(it.get("compId"))
+            if not c:
+                continue
+            props = it.get("props", {})
+            css = c.get("css", "")
+            if css and css not in css_parts:
+                css_parts.append(css)
+            if it.get("compId") == "c_form":
+                html_parts.append(render_comp_html(c, props, close=False) + "\n")
+                walk(it.get("children", []))
+                html_parts.append("</form></div>\n")
+            else:
+                html_parts.append(render_comp_html(c, props) + "\n")
+    walk(comps)
+    GEN_STYLE_CSS = ".dp-wrap{box-sizing:border-box}.dp-a-左{text-align:left}.dp-a-居中{text-align:center}.dp-a-右{text-align:right}.dp-w-全宽{width:100%}.dp-w-默认{width:auto}.dp-w-半宽{width:50%}.dp-b-无{border:none}.dp-b-细{border:1px solid #d0d5dd}.dp-b-明显{border:2px solid #2f6fed}.dp-r-小{border-radius:4px}.dp-r-中{border-radius:10px}.dp-r-大{border-radius:16px}.dp-m-小{margin:4px 0}.dp-m-中{margin:12px 0}.dp-m-大{margin:20px 0}"
+    page_css = GEN_STYLE_CSS + "\n" + "\n".join(css_parts)
+    page_html = "".join(html_parts)
+
+    page_js = r'''function toast(msg){var t=document.createElement('div');t.style.cssText='position:fixed;left:50%;bottom:30px;transform:translateX(-50%);background:#222;color:#fff;padding:10px 18px;border-radius:8px;font-size:14px;z-index:99';t.textContent=msg;document.body.appendChild(t);setTimeout(function(){t.remove()},2200);}
+function _h(s){return String(s==null?'':s).replace(/[&<>"']/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];});}
+document.querySelectorAll('.dp-list').forEach(function(el){
+  var tbl=el.getAttribute('data-table'), flds=(el.getAttribute('data-fields')||'').split(',').map(function(s){return s.trim()}).filter(Boolean);
+  fetch('/api/data/'+tbl).then(function(r){return r.json()}).then(function(j){
+    if(!j.ok){el.innerHTML='<div style="color:#d64545">加载失败:'+_h(j.error)+'</div>';return;}
+    if(!j.rows.length){el.innerHTML='<div style="color:#999">暂无数据</div>';return;}
+    el.innerHTML=j.rows.map(function(r){
+      var cells=flds.length?flds.map(function(f){return '<div style="margin:2px 0">'+_h(String(r[f]||''))+'</div>'}).join(''):_h(JSON.stringify(r));
+      return '<div class="dp-row">'+cells+'</div>';
+    }).join('');
+  }).catch(function(){el.innerHTML='<div style="color:#d64545">请求失败</div>';});
+});
+document.querySelectorAll('.dp-form').forEach(function(f){
+  f.addEventListener('submit',function(ev){
+    ev.preventDefault();
+    var tbl=f.getAttribute('data-table')||'users';
+    var data={};
+    f.querySelectorAll('.dp-input').forEach(function(inp){data[inp.getAttribute('data-field')||'']=inp.value;});
+    fetch('/api/data/'+tbl,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)}).then(function(r){return r.json()}).then(function(j){
+      if(j.ok){toast('提交成功');f.reset();}
+      else{toast('提交失败:'+_h(j.error));}
+    }).catch(function(){toast('网络错误');});
+  });
+});
+document.querySelectorAll('.dp-btn').forEach(function(b){
+  b.addEventListener('click',function(){
+    var act=b.getAttribute('data-action')||'', arg=b.getAttribute('data-arg')||'';
+    if(act==='提交到数据表'){var f=b.closest('.dp-form');if(f){f.requestSubmit?f.requestSubmit():f.submit();}else{toast('按钮不在表单内，无法提交');}}
+    else if(act==='提示消息'){toast(arg);}
+    else if(act==='打开链接'){window.open(arg,'_blank');}
+  });
+});
+'''
+    index_html = ('<!DOCTYPE html><html lang="zh"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
+                  '<title>%s</title><style>body{font-family:system-ui,-apple-system,"Segoe UI",sans-serif;max-width:640px;margin:0 auto;background:#f5f6f8;color:#222;padding-bottom:40px}%s</style></head>'
+                  '<body>%s<script>%s</script></body></html>') % (_html.escape(app.get("name", "我的应用")), page_css, page_html, page_js)
+
+    os.makedirs(os.path.join(out_dir, "templates"), exist_ok=True)
+    with open(os.path.join(out_dir, "templates", "index.html"), "w", encoding="utf-8") as f:
+        f.write(index_html)
+    # 路由说明文档（随应用打包，可拷走）
+    routes_md = ["# %s 路由说明\n" % app.get("name", "我的应用")]
+    routes_md.append("## 后端接口\n\n| 方法 | 路由 | 用途 |\n|---|---|---|")
+    routes_md.append("| POST | /api/data/{表} | 写入一条数据（表单 / 提交按钮触发） |")
+    routes_md.append("| GET | /api/data/{表} | 读取该表全部数据（数据列表触发） |")
+    routes_md.append("| POST | /api/_shutdown | 优雅停止本应用服务 |")
+    if os.path.exists(os.path.join(out_dir, "assets")):
+        routes_md.append("| GET | /assets/{文件} | 静态资源（图片，白名单防穿越） |")
+    if tables:
+        routes_md.append("\n## 数据表\n")
+        for tbl in sorted(tables.keys()):
+            routes_md.append("- `%s`：字段 %s" % (tbl, ", ".join(tables[tbl])))
+    routes_md.append("\n## 前端触发\n")
+    for f in forms:
+        routes_md.append("- 表单容器 → POST /api/data/%s" % f.get("table"))
+    for b in buttons:
+        p2 = b.get("props", {})
+        routes_md.append("- 按钮「%s」→ POST /api/data/%s" % (p2.get("text", "提交"), b.get("table", "users")))
+    for l in lists:
+        p2 = l.get("props", {})
+        routes_md.append("- 数据列表「%s」→ GET /api/data/%s" % (p2.get("table", "列表"), p2.get("table", "users")))
+    with open(os.path.join(out_dir, "templates", "ROUTES.md"), "w", encoding="utf-8", newline="") as f:
+        f.write("\n".join(routes_md))
+
+    app_py = APP_PY_TEMPLATE.replace("{appname}", app.get("name", "我的应用")).replace("{port}", str(port)).replace("{tables!r}", repr(tables))
+    with open(os.path.join(out_dir, "app.py"), "w", encoding="utf-8", newline="") as f:
+        f.write(app_py)
+    return {"ok": True, "path": out_dir, "port": port, "tables": tables,
+            "index": os.path.join(out_dir, "templates", "index.html")}
+
+def _port_in_use(port):
+    import socket
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    try:
+        s.bind(("127.0.0.1", port))
+        return False
+    except OSError:
+        return True
+    finally:
+        s.close()
+
+def api_app_run(params):
+    name = str(params.get("name", "")).strip()
+    safe = re.sub(r"[^\w\u4e00-\u9fa5-]", "_", name)
+    rt = load_json(APPS_RUNTIME, {})
+    if safe in rt:
+        if _proc_alive(rt[safe].get("pid")):
+            return {"ok": True, "already": True, "info": rt[safe]}
+        rt.pop(safe, None)
+    gen = api_app_generate(params)
+    if not gen.get("ok"):
+        return gen
+    out_dir = gen["path"]; port = gen["port"]
+    proc = subprocess.Popen([sys.executable, "app.py"], cwd=out_dir,
+                            creationflags=getattr(subprocess, "CREATE_NEW_PROCESS_GROUP", 0),
+                            stdout=open(os.path.join(LOGS, "app_%s.log" % safe), "w", encoding="utf-8"),
+                            stderr=subprocess.STDOUT)
+    import time as _t
+    # 等待端口就绪（最多 8 秒），避免前端打开页面时连接被拒
+    _dead = _t.time() + 8
+    _ready = False
+    while _t.time() < _dead:
+        try:
+            _s = socket.create_connection(("127.0.0.1", port), timeout=0.4)
+            _s.close()
+            _ready = True
+            break
+        except OSError:
+            _t.sleep(0.25)
+    if not _ready:
+        if not _proc_alive(proc.pid):
+            return {"ok": False, "error": "应用启动失败（可查看 logs/app_%s.log）" % safe}
+    else:
+        _t.sleep(0.3)
+    rt[safe] = {"pid": proc.pid, "port": port, "path": out_dir, "ts": int(_t.time())}
+    save_json(APPS_RUNTIME, rt)
+    log("app run: %s pid=%s port=%s" % (safe, proc.pid, port))
+    return {"ok": True, "info": rt[safe]}
+
+def api_app_stop(params):
+    name = str(params.get("name", "")).strip()
+    safe = re.sub(r"[^\w\u4e00-\u9fa5-]", "_", name)
+    rt = load_json(APPS_RUNTIME, {})
+    info = rt.get(safe)
+    pid = (info or {}).get("pid")
+    port = (info or {}).get("port")
+    log("app stop: %s pid=%s port=%s" % (safe, pid, port))
+    if pid and _proc_alive(pid):
+        # 1) 先请求优雅关闭（仅本机）
+        if port:
+            try:
+                import urllib.request as _ur
+                req = _ur.Request("http://127.0.0.1:%d/api/_shutdown" % port, method="POST")
+                _ur.urlopen(req, timeout=3).read()
+                import time as _t
+                _t.sleep(0.8)
+            except Exception:
+                pass
+        # 2) 兜底强制结束（不带 /T，只杀目标进程）
+        if _proc_alive(pid):
+            r = subprocess.run(["taskkill", "/F", "/PID", str(pid)], capture_output=True, text=True)
+            log("app stop kill: %s" % ((r.stdout or "").strip() or (r.stderr or "").strip()))
+    rt.pop(safe, None)
+    save_json(APPS_RUNTIME, rt)
+    return {"ok": True, "stopped": True}
+
+def api_app_status(params):
+    name = str(params.get("name", "")).strip()
+    safe = re.sub(r"[^\w\u4e00-\u9fa5-]", "_", name)
+    rt = load_json(APPS_RUNTIME, {})
+    info = rt.get(safe)
+    if info and _proc_alive(info.get("pid")):
+        return {"ok": True, "running": True, "info": info}
+    if info:
+        rt.pop(safe, None); save_json(APPS_RUNTIME, rt)
+    return {"ok": True, "running": False, "info": None}
+
+def _proc_alive(pid):
+    if not pid:
+        return False
+    try:
+        import ctypes
+        h = ctypes.windll.kernel32.OpenProcess(0x1000, False, int(pid))
+        if not h:
+            return False
+        ctypes.windll.kernel32.CloseHandle(h)
+        return True
+    except Exception:
+        return False
+
+def api_app_dbview(params):
+    name = str(params.get("name", "")).strip()
+    if not name:
+        return {"ok": False, "error": "缺应用名"}
+    safe = re.sub(r"[^\w\u4e00-\u9fa5-]", "_", name)
+    dbp = os.path.join(APPS_WORK, safe, "data.db")
+    if not os.path.exists(dbp):
+        return {"ok": False, "error": "应用尚未生成（请先「生成前后端」）"}
+    con = sqlite3.connect(dbp)
+    con.row_factory = sqlite3.Row
+    tabs = []
+    try:
+        rows = con.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'").fetchall()
+        for r in rows:
+            t = r["name"]
+            if not re.match(r"^[\w\u4e00-\u9fa5-]+$", t):
+                continue
+            cnt = con.execute("SELECT COUNT(*) c FROM `%s`" % t).fetchone()["c"]
+            cols = [c2["name"] for c2 in con.execute("PRAGMA table_info(`%s`)" % t).fetchall()]
+            data = [dict(x) for x in con.execute("SELECT * FROM `%s` ORDER BY id DESC LIMIT 5" % t).fetchall()]
+            tabs.append({"name": t, "cols": cols, "count": cnt, "rows": data})
+    finally:
+        con.close()
+    return {"ok": True, "tables": tabs}
+
+def api_app_files(params):
+
+    name = str(params.get("name", "")).strip()
+    if not name:
+        return {"ok": False, "error": "缺应用名"}
+    safe = re.sub(r"[^\w\u4e00-\u9fa5-]", "_", name)
+    d = os.path.join(APPS_WORK, safe)
+    if not os.path.isdir(d):
+        return {"ok": False, "error": "应用尚未生成（请先「生成前后端」）"}
+    files = []
+    for label, rel in (("app.py（后端）", os.path.join("app.py")),
+                       ("index.html（前端页面）", os.path.join("templates", "index.html")),
+                       ("ROUTES.md（路由说明）", os.path.join("templates", "ROUTES.md"))):
+        fp = os.path.join(d, rel)
+        if os.path.exists(fp):
+            with open(fp, "r", encoding="utf-8", errors="replace") as f:
+                files.append({"label": label, "content": f.read()})
+    return {"ok": True, "files": files, "path": d}
+
+def api_app_db_exec(params):
+    name = str(params.get("name", "")).strip()
+    if not name:
+        return {"ok": False, "error": "缺应用名"}
+    safe = re.sub(r"[^\w\u4e00-\u9fa5-]", "_", name)
+    dbp = os.path.join(APPS_WORK, safe, "data.db")
+    if not os.path.exists(dbp):
+        return {"ok": False, "error": "应用尚未生成（请先「生成前后端」）"}
+    action = str(params.get("action", ""))
+    table = str(params.get("table", ""))
+    if not re.match(r"^[\w\u4e00-\u9fa5-]+$", table):
+        return {"ok": False, "error": "非法表名"}
+    _FIELD_RE = re.compile(r"^[\w\u4e00-\u9fa5-]+$")
+    def _bad(v):
+        return not v or not _FIELD_RE.match(v)
+    con = sqlite3.connect(dbp)
+    con.row_factory = sqlite3.Row
+    try:
+        if action == "update_cell":
+            field = str(params.get("field", ""))
+            rowid = int(params.get("id", 0))
+            if _bad(field) or field == "id":
+                return {"ok": False, "error": "非法字段"}
+            cols = [c["name"] for c in con.execute("PRAGMA table_info(`%s`)" % table)]
+            if field not in cols:
+                return {"ok": False, "error": "字段不存在: %s" % field}
+            con.execute("UPDATE `%s` SET `%s`=? WHERE id=?" % (table, field), (params.get("value"), rowid))
+        elif action == "insert_row":
+            values = params.get("values") or {}
+            cols = [c["name"] for c in con.execute("PRAGMA table_info(`%s`)" % table)]
+            vd = {k: v for k, v in values.items() if k in cols and _FIELD_RE.match(k) and k != "id"}
+            if not vd:
+                return {"ok": False, "error": "没有可写入的字段值"}
+            ks = list(vd.keys())
+            con.execute("INSERT INTO `%s` (%s) VALUES (%s)" % (table, ",".join("`%s`" % k for k in ks), ",".join("?" * len(ks))), list(vd.values()))
+        elif action == "delete_row":
+            rowid = int(params.get("id", 0))
+            con.execute("DELETE FROM `%s` WHERE id=?" % table, (rowid,))
+        elif action == "add_column":
+            colname = str(params.get("field", ""))
+            ctype = str(params.get("ctype", "TEXT")).upper()
+            if _bad(colname) or colname == "id":
+                return {"ok": False, "error": "非法字段名"}
+            if ctype not in ("TEXT", "INTEGER", "REAL", "NUMERIC"):
+                ctype = "TEXT"
+            con.execute("ALTER TABLE `%s` ADD COLUMN `%s` %s" % (table, colname, ctype))
+        elif action == "drop_column":
+            colname = str(params.get("field", ""))
+            if _bad(colname) or colname == "id":
+                return {"ok": False, "error": "不能删除主键 id"}
+            cols = [c["name"] for c in con.execute("PRAGMA table_info(`%s`)" % table)]
+            if colname not in cols:
+                return {"ok": False, "error": "字段不存在"}
+            keep = [c for c in cols if c != colname]
+            if len(keep) < 1:
+                return {"ok": False, "error": "至少要保留一个字段"}
+            con.execute("BEGIN")
+            con.execute("ALTER TABLE `%s` RENAME TO _dp_old" % table)
+            con.execute("CREATE TABLE `%s` (%s, PRIMARY KEY(id))" % (table, ",".join("`%s`" % c for c in keep)))
+            con.execute("INSERT INTO `%s` (%s) SELECT %s FROM _dp_old" % (table, ",".join("`%s`" % c for c in keep), ",".join("`%s`" % c for c in keep)))
+            con.execute("DROP TABLE _dp_old")
+            con.execute("COMMIT")
+        elif action == "drop_table":
+            con.execute("DROP TABLE IF EXISTS `%s`" % table)
+        elif action == "create_table":
+            tname = str(params.get("table", ""))
+            cols = params.get("cols") or []
+            if _bad(tname):
+                return {"ok": False, "error": "非法表名"}
+            defs = ["id INTEGER PRIMARY KEY AUTOINCREMENT"]
+            for c in cols:
+                cn = str(c.get("name", ""))
+                ct = str(c.get("type", "TEXT")).upper()
+                if _bad(cn) or cn == "id":
+                    continue
+                if ct not in ("TEXT", "INTEGER", "REAL", "NUMERIC"):
+                    ct = "TEXT"
+                defs.append("`%s` %s" % (cn, ct))
+            con.execute("CREATE TABLE IF NOT EXISTS `%s` (%s)" % (tname, ",".join(defs)))
+        else:
+            return {"ok": False, "error": "未知操作: %s" % action}
+        con.commit()
+    except Exception as e:
+        try:
+            con.rollback()
+        except Exception:
+            pass
+        return {"ok": False, "error": str(e)}
+    finally:
+        con.close()
+    return {"ok": True}

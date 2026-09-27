@@ -1,0 +1,813 @@
+{
+  "components": [
+    {
+      "id": "c_title",
+      "name": "标题",
+      "category": "基础",
+      "desc": "页面大标题",
+      "color": "#2f6fed",
+      "props": [
+        {
+          "key": "text",
+          "label": "标题文字",
+          "type": "text",
+          "default": "欢迎使用我的应用"
+        },
+        {
+          "key": "size",
+          "label": "字号",
+          "type": "select",
+          "options": [
+            "大",
+            "中",
+            "小"
+          ],
+          "default": "大"
+        },
+        {
+          "key": "align",
+          "label": "对齐",
+          "type": "select",
+          "options": [
+            "左",
+            "居中",
+            "右"
+          ],
+          "default": "左"
+        },
+        {
+          "key": "width",
+          "label": "宽度",
+          "type": "select",
+          "options": [
+            "默认",
+            "全宽",
+            "半宽"
+          ],
+          "default": "默认"
+        },
+        {
+          "key": "border",
+          "label": "边框",
+          "type": "select",
+          "options": [
+            "无",
+            "细",
+            "明显"
+          ],
+          "default": "无"
+        },
+        {
+          "key": "radius",
+          "label": "圆角",
+          "type": "select",
+          "options": [
+            "小",
+            "中",
+            "大"
+          ],
+          "default": "小"
+        },
+        {
+          "key": "margin",
+          "label": "外边距(位置)",
+          "type": "select",
+          "options": [
+            "小",
+            "中",
+            "大"
+          ],
+          "default": "中"
+        }
+      ],
+      "html": "<h1 class=\"dp-title\" data-size=\"{size}\">{text}</h1>",
+      "css": ".dp-title[data-size='大']{font-size:28px}.dp-title[data-size='中']{font-size:22px}.dp-title[data-size='小']{font-size:18px}"
+    },
+    {
+      "id": "c_text",
+      "name": "文本",
+      "category": "基础",
+      "desc": "一段说明文字",
+      "color": "#2f6fed",
+      "props": [
+        {
+          "key": "text",
+          "label": "内容",
+          "type": "textarea",
+          "default": "这是一段说明文字"
+        },
+        {
+          "key": "color",
+          "label": "文字颜色",
+          "type": "select",
+          "options": [
+            "默认",
+            "灰色",
+            "蓝色",
+            "红色"
+          ],
+          "default": "默认"
+        },
+        {
+          "key": "align",
+          "label": "对齐",
+          "type": "select",
+          "options": [
+            "左",
+            "居中",
+            "右"
+          ],
+          "default": "左"
+        },
+        {
+          "key": "width",
+          "label": "宽度",
+          "type": "select",
+          "options": [
+            "默认",
+            "全宽",
+            "半宽"
+          ],
+          "default": "默认"
+        },
+        {
+          "key": "border",
+          "label": "边框",
+          "type": "select",
+          "options": [
+            "无",
+            "细",
+            "明显"
+          ],
+          "default": "无"
+        },
+        {
+          "key": "radius",
+          "label": "圆角",
+          "type": "select",
+          "options": [
+            "小",
+            "中",
+            "大"
+          ],
+          "default": "小"
+        },
+        {
+          "key": "margin",
+          "label": "外边距(位置)",
+          "type": "select",
+          "options": [
+            "小",
+            "中",
+            "大"
+          ],
+          "default": "中"
+        }
+      ],
+      "html": "<p class=\"dp-text\" data-color=\"{color}\">{text}</p>",
+      "css": ".dp-text[data-color='灰色']{color:#666}.dp-text[data-color='蓝色']{color:#2f6fed}.dp-text[data-color='红色']{color:#d64545}"
+    },
+    {
+      "id": "c_input",
+      "name": "输入框",
+      "category": "表单",
+      "desc": "单行文本输入，可绑定数据字段",
+      "color": "#159f6f",
+      "props": [
+        {
+          "key": "label",
+          "label": "标签",
+          "type": "text",
+          "default": "姓名"
+        },
+        {
+          "key": "field",
+          "label": "绑定字段",
+          "type": "text",
+          "default": "name"
+        },
+        {
+          "key": "placeholder",
+          "label": "占位提示",
+          "type": "text",
+          "default": "请输入"
+        },
+        {
+          "key": "align",
+          "label": "对齐",
+          "type": "select",
+          "options": [
+            "左",
+            "居中",
+            "右"
+          ],
+          "default": "左"
+        },
+        {
+          "key": "width",
+          "label": "宽度",
+          "type": "select",
+          "options": [
+            "默认",
+            "全宽",
+            "半宽"
+          ],
+          "default": "默认"
+        },
+        {
+          "key": "border",
+          "label": "边框",
+          "type": "select",
+          "options": [
+            "无",
+            "细",
+            "明显"
+          ],
+          "default": "无"
+        },
+        {
+          "key": "radius",
+          "label": "圆角",
+          "type": "select",
+          "options": [
+            "小",
+            "中",
+            "大"
+          ],
+          "default": "小"
+        },
+        {
+          "key": "margin",
+          "label": "外边距(位置)",
+          "type": "select",
+          "options": [
+            "小",
+            "中",
+            "大"
+          ],
+          "default": "中"
+        }
+      ],
+      "html": "<label class=\"dp-field\"><span>{label}</span><input class=\"dp-input\" data-field=\"{field}\" placeholder=\"{placeholder}\"></label>",
+      "css": ".dp-field{display:block;margin:10px 0}.dp-field span{display:block;font-size:13px;margin-bottom:4px;color:#333}.dp-input{width:100%;box-sizing:border-box;padding:8px 10px;border:1px solid #d0d5dd;border-radius:6px;font-size:14px}"
+    },
+    {
+      "id": "c_textarea",
+      "name": "多行输入",
+      "category": "表单",
+      "desc": "多行文本输入",
+      "color": "#159f6f",
+      "props": [
+        {
+          "key": "label",
+          "label": "标签",
+          "type": "text",
+          "default": "留言"
+        },
+        {
+          "key": "field",
+          "label": "绑定字段",
+          "type": "text",
+          "default": "message"
+        },
+        {
+          "key": "placeholder",
+          "label": "占位提示",
+          "type": "text",
+          "default": "请输入内容"
+        },
+        {
+          "key": "align",
+          "label": "对齐",
+          "type": "select",
+          "options": [
+            "左",
+            "居中",
+            "右"
+          ],
+          "default": "左"
+        },
+        {
+          "key": "width",
+          "label": "宽度",
+          "type": "select",
+          "options": [
+            "默认",
+            "全宽",
+            "半宽"
+          ],
+          "default": "默认"
+        },
+        {
+          "key": "border",
+          "label": "边框",
+          "type": "select",
+          "options": [
+            "无",
+            "细",
+            "明显"
+          ],
+          "default": "无"
+        },
+        {
+          "key": "radius",
+          "label": "圆角",
+          "type": "select",
+          "options": [
+            "小",
+            "中",
+            "大"
+          ],
+          "default": "小"
+        },
+        {
+          "key": "margin",
+          "label": "外边距(位置)",
+          "type": "select",
+          "options": [
+            "小",
+            "中",
+            "大"
+          ],
+          "default": "中"
+        }
+      ],
+      "html": "<label class=\"dp-field\"><span>{label}</span><textarea class=\"dp-input\" data-field=\"{field}\" placeholder=\"{placeholder}\" rows=\"3\"></textarea></label>",
+      "css": ""
+    },
+    {
+      "id": "c_button",
+      "name": "按钮",
+      "category": "表单",
+      "desc": "提交按钮，可配置动作",
+      "color": "#159f6f",
+      "props": [
+        {
+          "key": "text",
+          "label": "按钮文字",
+          "type": "text",
+          "default": "提交"
+        },
+        {
+          "key": "action",
+          "label": "点击动作",
+          "type": "select",
+          "options": [
+            "提交到数据表",
+            "提示消息",
+            "打开链接",
+            "无动作"
+          ],
+          "default": "提示消息"
+        },
+        {
+          "key": "action_data",
+          "label": "动作参数（表名/消息/链接）",
+          "type": "text",
+          "default": "提交成功！"
+        },
+        {
+          "key": "align",
+          "label": "对齐",
+          "type": "select",
+          "options": [
+            "左",
+            "居中",
+            "右"
+          ],
+          "default": "左"
+        },
+        {
+          "key": "width",
+          "label": "宽度",
+          "type": "select",
+          "options": [
+            "默认",
+            "全宽",
+            "半宽"
+          ],
+          "default": "默认"
+        },
+        {
+          "key": "border",
+          "label": "边框",
+          "type": "select",
+          "options": [
+            "无",
+            "细",
+            "明显"
+          ],
+          "default": "无"
+        },
+        {
+          "key": "radius",
+          "label": "圆角",
+          "type": "select",
+          "options": [
+            "小",
+            "中",
+            "大"
+          ],
+          "default": "小"
+        },
+        {
+          "key": "margin",
+          "label": "外边距(位置)",
+          "type": "select",
+          "options": [
+            "小",
+            "中",
+            "大"
+          ],
+          "default": "中"
+        }
+      ],
+      "html": "<button class=\"dp-btn\" data-action=\"{action}\" data-arg=\"{action_data}\">{text}</button>",
+      "css": ".dp-btn{background:#2f6fed;color:#fff;border:none;border-radius:6px;padding:10px 18px;font-size:14px;cursor:pointer}.dp-btn:hover{opacity:.9}"
+    },
+    {
+      "id": "c_list",
+      "name": "数据列表",
+      "category": "数据",
+      "desc": "展示数据表内容",
+      "color": "#7c3aed",
+      "props": [
+        {
+          "key": "table",
+          "label": "数据表",
+          "type": "text",
+          "default": "users"
+        },
+        {
+          "key": "fields",
+          "label": "显示字段（逗号分隔）",
+          "type": "text",
+          "default": "name,message"
+        },
+        {
+          "key": "align",
+          "label": "对齐",
+          "type": "select",
+          "options": [
+            "左",
+            "居中",
+            "右"
+          ],
+          "default": "左"
+        },
+        {
+          "key": "width",
+          "label": "宽度",
+          "type": "select",
+          "options": [
+            "默认",
+            "全宽",
+            "半宽"
+          ],
+          "default": "默认"
+        },
+        {
+          "key": "border",
+          "label": "边框",
+          "type": "select",
+          "options": [
+            "无",
+            "细",
+            "明显"
+          ],
+          "default": "无"
+        },
+        {
+          "key": "radius",
+          "label": "圆角",
+          "type": "select",
+          "options": [
+            "小",
+            "中",
+            "大"
+          ],
+          "default": "小"
+        },
+        {
+          "key": "margin",
+          "label": "外边距(位置)",
+          "type": "select",
+          "options": [
+            "小",
+            "中",
+            "大"
+          ],
+          "default": "中"
+        }
+      ],
+      "html": "<div class=\"dp-list\" data-table=\"{table}\" data-fields=\"{fields}\"></div>",
+      "css": ".dp-list{background:#f7f8fa;border:1px solid #e5e8ee;border-radius:8px;padding:10px;font-size:14px}.dp-list .dp-row{padding:6px 0;border-bottom:1px solid #eee}.dp-list .dp-row:last-child{border-bottom:none}"
+    },
+    {
+      "id": "c_form",
+      "name": "表单容器",
+      "category": "表单",
+      "desc": "把输入组件包起来，提交时一起入库",
+      "color": "#159f6f",
+      "props": [
+        {
+          "key": "table",
+          "label": "提交到数据表",
+          "type": "text",
+          "default": "users"
+        },
+        {
+          "key": "align",
+          "label": "对齐",
+          "type": "select",
+          "options": [
+            "左",
+            "居中",
+            "右"
+          ],
+          "default": "左"
+        },
+        {
+          "key": "width",
+          "label": "宽度",
+          "type": "select",
+          "options": [
+            "默认",
+            "全宽",
+            "半宽"
+          ],
+          "default": "默认"
+        },
+        {
+          "key": "border",
+          "label": "边框",
+          "type": "select",
+          "options": [
+            "无",
+            "细",
+            "明显"
+          ],
+          "default": "无"
+        },
+        {
+          "key": "radius",
+          "label": "圆角",
+          "type": "select",
+          "options": [
+            "小",
+            "中",
+            "大"
+          ],
+          "default": "小"
+        },
+        {
+          "key": "margin",
+          "label": "外边距(位置)",
+          "type": "select",
+          "options": [
+            "小",
+            "中",
+            "大"
+          ],
+          "default": "中"
+        }
+      ],
+      "html": "<form class=\"dp-form\" data-table=\"{table}\">",
+      "css": ".dp-form{background:#fff;border:1px solid #e5e8ee;border-radius:10px;padding:16px}"
+    },
+    {
+      "id": "c_image",
+      "name": "图片",
+      "category": "媒体",
+      "desc": "展示一张图片",
+      "color": "#b7791f",
+      "props": [
+        {
+          "key": "src",
+          "label": "图片地址（上传/线上下载）",
+          "type": "img",
+          "default": ""
+        },
+        {
+          "key": "alt",
+          "label": "替代文字",
+          "type": "text",
+          "default": "图片"
+        },
+        {
+          "key": "align",
+          "label": "对齐",
+          "type": "select",
+          "options": [
+            "左",
+            "居中",
+            "右"
+          ],
+          "default": "左"
+        },
+        {
+          "key": "width",
+          "label": "宽度",
+          "type": "select",
+          "options": [
+            "默认",
+            "全宽",
+            "半宽"
+          ],
+          "default": "默认"
+        },
+        {
+          "key": "border",
+          "label": "边框",
+          "type": "select",
+          "options": [
+            "无",
+            "细",
+            "明显"
+          ],
+          "default": "无"
+        },
+        {
+          "key": "radius",
+          "label": "圆角",
+          "type": "select",
+          "options": [
+            "小",
+            "中",
+            "大"
+          ],
+          "default": "小"
+        },
+        {
+          "key": "margin",
+          "label": "外边距(位置)",
+          "type": "select",
+          "options": [
+            "小",
+            "中",
+            "大"
+          ],
+          "default": "中"
+        }
+      ],
+      "html": "<img class=\"dp-img\" src=\"{src}\" alt=\"{alt}\" style=\"max-width:100%;border-radius:8px\">",
+      "css": ""
+    },
+    {
+      "id": "c_nav",
+      "name": "导航栏",
+      "category": "布局",
+      "desc": "顶部导航栏",
+      "color": "#5b6472",
+      "props": [
+        {
+          "key": "logo",
+          "label": "Logo 图片（上传/线上下载）",
+          "type": "img",
+          "as": "img-tag",
+          "default": ""
+        },
+        {
+          "key": "title",
+          "label": "应用名称",
+          "type": "text",
+          "default": "我的应用"
+        },
+        {
+          "key": "bg",
+          "label": "背景色",
+          "type": "select",
+          "options": [
+            "深色",
+            "蓝色",
+            "白色"
+          ],
+          "default": "深色"
+        },
+        {
+          "key": "align",
+          "label": "对齐",
+          "type": "select",
+          "options": [
+            "左",
+            "居中",
+            "右"
+          ],
+          "default": "左"
+        },
+        {
+          "key": "width",
+          "label": "宽度",
+          "type": "select",
+          "options": [
+            "默认",
+            "全宽",
+            "半宽"
+          ],
+          "default": "默认"
+        },
+        {
+          "key": "border",
+          "label": "边框",
+          "type": "select",
+          "options": [
+            "无",
+            "细",
+            "明显"
+          ],
+          "default": "无"
+        },
+        {
+          "key": "radius",
+          "label": "圆角",
+          "type": "select",
+          "options": [
+            "小",
+            "中",
+            "大"
+          ],
+          "default": "小"
+        },
+        {
+          "key": "margin",
+          "label": "外边距(位置)",
+          "type": "select",
+          "options": [
+            "小",
+            "中",
+            "大"
+          ],
+          "default": "中"
+        }
+      ],
+      "html": "<div class=\"dp-nav\" data-bg=\"{bg}\">{logo}{title}</div>",
+      "css": ".dp-nav{display:flex;align-items:center;gap:8px;padding:14px 16px;color:#fff;font-size:16px;font-weight:600}.dp-nav .dp-nav-logo{height:24px;border-radius:4px}.dp-nav[data-bg='蓝色']{background:#2f6fed}.dp-nav[data-bg='白色']{background:#fff;color:#333;border-bottom:1px solid #eee}"
+    },
+    {
+      "id": "c_divider",
+      "name": "分割线",
+      "category": "布局",
+      "desc": "内容分隔线",
+      "color": "#5b6472",
+      "props": [
+        {
+          "key": "align",
+          "label": "对齐",
+          "type": "select",
+          "options": [
+            "左",
+            "居中",
+            "右"
+          ],
+          "default": "左"
+        },
+        {
+          "key": "width",
+          "label": "宽度",
+          "type": "select",
+          "options": [
+            "默认",
+            "全宽",
+            "半宽"
+          ],
+          "default": "默认"
+        },
+        {
+          "key": "border",
+          "label": "边框",
+          "type": "select",
+          "options": [
+            "无",
+            "细",
+            "明显"
+          ],
+          "default": "无"
+        },
+        {
+          "key": "radius",
+          "label": "圆角",
+          "type": "select",
+          "options": [
+            "小",
+            "中",
+            "大"
+          ],
+          "default": "小"
+        },
+        {
+          "key": "margin",
+          "label": "外边距(位置)",
+          "type": "select",
+          "options": [
+            "小",
+            "中",
+            "大"
+          ],
+          "default": "中"
+        }
+      ],
+      "html": "<hr class=\"dp-hr\" style=\"border:none;border-top:1px solid #e5e8ee;margin:14px 0\">",
+      "css": ""
+    }
+  ]
+}

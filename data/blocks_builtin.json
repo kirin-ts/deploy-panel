@@ -1,0 +1,279 @@
+{
+  "blocks": [
+    {
+      "id": "b_start",
+      "name": "开始",
+      "category": "流程",
+      "desc": "程序入口，放在最上面",
+      "color": "#159f6f",
+      "params": [],
+      "template": "pass  # 程序开始",
+      "editable": false
+    },
+    {
+      "id": "b_print",
+      "name": "打印文本",
+      "category": "基础",
+      "desc": "输出一行文字到控制台",
+      "color": "#2f6fed",
+      "params": [
+        {
+          "key": "text",
+          "label": "内容",
+          "type": "text",
+          "default": "你好，世界"
+        }
+      ],
+      "template": "print({text!r})",
+      "editable": true
+    },
+    {
+      "id": "b_input",
+      "name": "读取输入",
+      "category": "基础",
+      "desc": "从控制台读一行输入，存入变量",
+      "color": "#2f6fed",
+      "params": [
+        {
+          "key": "prompt",
+          "label": "提示语",
+          "type": "text",
+          "default": "请输入："
+        },
+        {
+          "key": "var",
+          "label": "存入变量",
+          "type": "text",
+          "default": "name"
+        }
+      ],
+      "template": "{var} = input({prompt!r})",
+      "editable": true
+    },
+    {
+      "id": "b_var_set",
+      "name": "设置变量",
+      "category": "基础",
+      "desc": "给变量赋值。值可以是数字(5)、带引号的文本('你好')或另一个变量名(x)",
+      "color": "#2f6fed",
+      "params": [
+        {
+          "key": "name",
+          "label": "变量名",
+          "type": "text",
+          "default": "x"
+        },
+        {
+          "key": "value",
+          "label": "值",
+          "type": "text",
+          "default": "5"
+        }
+      ],
+      "template": "{name} = {value}",
+      "editable": true
+    },
+    {
+      "id": "b_sleep",
+      "name": "等待",
+      "category": "流程",
+      "desc": "暂停指定秒数",
+      "color": "#b7791f",
+      "params": [
+        {
+          "key": "sec",
+          "label": "秒数",
+          "type": "number",
+          "default": "1"
+        }
+      ],
+      "template": "import time; time.sleep({sec})",
+      "editable": true
+    },
+    {
+      "id": "b_if",
+      "name": "如果…否则…",
+      "category": "流程",
+      "desc": "条件分支：条件成立走右侧(是)，否则走左侧(否)",
+      "color": "#b7791f",
+      "params": [
+        {
+          "key": "cond",
+          "label": "条件表达式",
+          "type": "text",
+          "default": "x > 0"
+        }
+      ],
+      "template": "",
+      "kind": "if",
+      "editable": true
+    },
+    {
+      "id": "b_for",
+      "name": "遍历循环",
+      "category": "流程",
+      "desc": "对列表/范围逐项执行循环体",
+      "color": "#b7791f",
+      "params": [
+        {
+          "key": "items",
+          "label": "遍历对象",
+          "type": "text",
+          "default": "range(3)"
+        },
+        {
+          "key": "var",
+          "label": "循环变量",
+          "type": "text",
+          "default": "item"
+        }
+      ],
+      "template": "",
+      "kind": "for",
+      "editable": true
+    },
+    {
+      "id": "b_while",
+      "name": "条件循环",
+      "category": "流程",
+      "desc": "条件成立时重复执行循环体",
+      "color": "#b7791f",
+      "params": [
+        {
+          "key": "cond",
+          "label": "条件表达式",
+          "type": "text",
+          "default": "True"
+        }
+      ],
+      "template": "",
+      "kind": "while",
+      "editable": true
+    },
+    {
+      "id": "b_file_write",
+      "name": "写入文件",
+      "category": "文件",
+      "desc": "把内容写入文本文件",
+      "color": "#159f6f",
+      "params": [
+        {
+          "key": "path",
+          "label": "文件路径",
+          "type": "text",
+          "default": "output.txt"
+        },
+        {
+          "key": "content",
+          "label": "内容",
+          "type": "text",
+          "default": "hello"
+        }
+      ],
+      "template": "with open({path!r}, 'w', encoding='utf-8') as f: f.write({content!r})",
+      "editable": true
+    },
+    {
+      "id": "b_file_read",
+      "name": "读取文件",
+      "category": "文件",
+      "desc": "读取文本文件内容到变量",
+      "color": "#159f6f",
+      "params": [
+        {
+          "key": "path",
+          "label": "文件路径",
+          "type": "text",
+          "default": "output.txt"
+        },
+        {
+          "key": "var",
+          "label": "存入变量",
+          "type": "text",
+          "default": "content"
+        }
+      ],
+      "template": "{var} = open({path!r}, encoding='utf-8').read()",
+      "editable": true
+    },
+    {
+      "id": "b_http_get",
+      "name": "请求网页",
+      "category": "网络",
+      "desc": "GET 请求一个 URL，响应文本存入变量",
+      "color": "#7c3aed",
+      "params": [
+        {
+          "key": "url",
+          "label": "URL",
+          "type": "text",
+          "default": "https://example.com"
+        },
+        {
+          "key": "var",
+          "label": "存入变量",
+          "type": "text",
+          "default": "resp"
+        }
+      ],
+      "template": "import urllib.request\n{var} = urllib.request.urlopen({url!r}, timeout=10).read().decode('utf-8', 'replace')",
+      "editable": true
+    },
+    {
+      "id": "b_db_query",
+      "name": "查询数据库",
+      "category": "数据库",
+      "desc": "对 SQLite 数据库执行 SQL，结果存入变量",
+      "color": "#d97706",
+      "params": [
+        {
+          "key": "db",
+          "label": "数据库文件",
+          "type": "text",
+          "default": "data.db"
+        },
+        {
+          "key": "sql",
+          "label": "SQL 语句",
+          "type": "text",
+          "default": "SELECT * FROM users"
+        },
+        {
+          "key": "var",
+          "label": "存入变量",
+          "type": "text",
+          "default": "rows"
+        }
+      ],
+      "template": "import sqlite3\ncon = sqlite3.connect({db!r})\n{var} = con.execute({sql!r}).fetchall()\ncon.close()",
+      "editable": true
+    },
+    {
+      "id": "b_run_python",
+      "name": "运行 Python 代码",
+      "category": "高级",
+      "desc": "执行一段自定义 Python 代码（注意：会真实运行）",
+      "color": "#d64545",
+      "params": [
+        {
+          "key": "code",
+          "label": "Python 代码",
+          "type": "textarea",
+          "default": "print('自定义代码')"
+        }
+      ],
+      "template": "exec({code!r})",
+      "editable": true
+    },
+    {
+      "id": "b_end",
+      "name": "结束",
+      "category": "流程",
+      "desc": "程序结尾标记",
+      "color": "#5b6472",
+      "params": [],
+      "template": "pass  # 结束",
+      "editable": false
+    }
+  ]
+}

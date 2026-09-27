@@ -1,0 +1,27 @@
+{
+  "restriction_keywords": [
+    {"kw": ["非商业", "不得商用", "禁止商用", "不可商用", "不得用于商业", "禁止商业使用", "仅供学习", "仅供个人使用", "仅限个人", "仅供研究", "不得用于牟利"], "zh": "禁止商业用途", "level": "red", "hint": "作者明确限制仅限学习/个人/非商业使用，商用将构成侵权"},
+    {"kw": ["non-commercial", "noncommercial", "no commercial use", "not for commercial", "non commercial"], "zh": "禁止商业用途（英文）", "level": "red", "hint": "README 声明 Non-commercial：禁止商用"},
+    {"kw": ["personal use only", "for personal use", "educational use only", "for learning only", "research only"], "zh": "仅限个人/学习/研究用途（英文）", "level": "orange", "hint": "作者限定个人或学习用途，超出范围需获授权"},
+    {"kw": ["禁止转载", "不得转载", "未经许可不得", "未经授权不得", "不得修改", "禁止修改", "禁止分发", "不得分发", "禁止再分发"], "zh": "禁止转载/修改/分发", "level": "red", "hint": "作者禁止转载、修改或分发，违反即侵权"},
+    {"kw": ["do not redistribute", "no redistribution", "redistribution prohibited", "do not modify", "modification prohibited", "no modification"], "zh": "禁止再分发/修改（英文）", "level": "red", "hint": "作者禁止再分发或修改"},
+    {"kw": ["需授权", "需要授权", "联系作者", "联系我授权", "license required", "contact author", "contact me for license", "must obtain permission"], "zh": "使用需授权", "level": "orange", "hint": "作者要求先获得授权，请先联系作者获取书面许可"},
+    {"kw": ["禁止倒卖", "不得倒卖", "禁止售卖", "不得售卖", "no resale", "not for sale"], "zh": "禁止售卖/倒卖", "level": "red", "hint": "作者禁止转售"},
+    {"kw": ["仅限特定人群", "仅限学生", "only for students"], "zh": "仅限特定人群使用", "level": "orange", "hint": "作者限定适用人群，确认自己是否符合条件"},
+    {"kw": ["禁止用于非法", "不得用于违法", "不得用于非法用途", "not for illegal use", "no illegal use"], "zh": "禁止用于非法用途", "level": "orange", "hint": "作者禁止非法用途——属常识红线，勿用于违法场景"}
+  ],
+  "usage_family_keywords": {
+    "gpl": ["gpl", "通用公共许可证", "general public license"],
+    "agpl": ["agpl", "affero"],
+    "lgpl": ["lgpl", "lesser general public license", "宽通用公共"],
+    "mit": ["mit license", "mit 许可", "permission is hereby granted"],
+    "apache": ["apache license", "apache-2.0", "apache 2.0"],
+    "bsd": ["bsd license", "bsd 3", "redistribution and use in source"],
+    "mpl": ["mozilla public license", "mpl"],
+    "cc0": ["cc0", "creative commons zero", "public domain"],
+    "unlicensed": ["all rights reserved", "未经许可", "保留所有权利"]
+  },
+  "readme_section_keywords": {
+    "zh": ["免责声明", "版权声明", "使用协议", "许可协议", "注意事项", "警告", "禁止", "限制", "协议", "license", "license:", "copyright", "terms of use", "disclaimer", "notice"]
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "name": "留言板",
+  "components": [
+    {
+      "uid": "clst1",
+      "compId": "c_list",
+      "props": {
+        "table": "messages",
+        "fields": "name,message"
+      }
+    }
+  ]
+}

@@ -1,0 +1,90 @@
+{
+  "scenarios": [
+    {
+      "id": "internal_use",
+      "zh": "仅内部/个人使用（不分发）",
+      "checks": [
+        {"item": "是否只在本机/团队内部运行，不向外部提供副本", "rule": "无分发则无源码义务", "level": "info"},
+        {"item": "是否未对外提供安装包/服务", "rule": "分发才触发义务", "level": "info"}
+      ],
+      "verdict": "low",
+      "zh_verdict": "自用场景通常不触发 GPL 义务，可安全使用"
+    },
+    {
+      "id": "redistribute_modified",
+      "zh": "修改后分发给他人/客户/公众",
+      "checks": [
+        {"item": "修改后的整个作品是否以同一 GPL 许可证提供", "rule": "GPL v2/v3 §5(b)、AGPL §5(b)", "level": "must"},
+        {"item": "是否随附对应源代码（含构建脚本与依赖）", "rule": "GPL v3 §6、v2 §3", "level": "must"},
+        {"item": "是否保留全部版权声明与许可证文本", "rule": "GPL v3 §4/§5(a)", "level": "must"},
+        {"item": "修改过的文件是否显著标注修改事实", "rule": "GPL v3 §5(a)", "level": "must"},
+        {"item": "是否向接收者施加了额外限制（如禁止商用）", "rule": "GPL v3 §12 禁止", "level": "must"},
+        {"item": "是否收费分发而拒绝提供源码拷贝", "rule": "允许收费，但源码义务不变", "level": "must"}
+      ],
+      "verdict": "high",
+      "zh_verdict": "分发场景必须履行全部开源义务，任一缺失即违规"
+    },
+    {
+      "id": "close_source_redistribute",
+      "zh": "闭源后分发给客户（GPL 红线）",
+      "checks": [
+        {"item": "是否将 GPL 代码编译进闭源二进制分发", "rule": "禁止：衍生作品必须 GPL 开源", "level": "must"},
+        {"item": "是否仅提供无法编译的部分源码充当对应源码", "rule": "GPL v3 §6 要求可构建的对应源码", "level": "must"},
+        {"item": "是否删除/隐藏了原版权声明", "rule": "禁止：同时构成著作权侵权", "level": "must"}
+      ],
+      "verdict": "critical",
+      "zh_verdict": "违规行为，应立即停止分发并移除相关闭源产物"
+    },
+    {
+      "id": "saas_deploy",
+      "zh": "SaaS/在线服务部署",
+      "checks": [
+        {"item": "许可证是否为 AGPL-3.0", "rule": "AGPL §13：远程交互须提供完整修改版源码", "level": "if_agpl"},
+        {"item": "许可证为 GPL v2/v3 时是否存在'传播'行为", "rule": "仅网络服务无源码义务；分发安装包/镜像则触发", "level": "info"},
+        {"item": "是否把服务部署包提供给了第三方", "rule": "提供给第三方=分发，触发 GPL 义务", "level": "must"}
+      ],
+      "verdict": "conditional",
+      "zh_verdict": "GPL v2/v3 部署 SaaS 通常无需开源；AGPL 必须开源修改版源码"
+    },
+    {
+      "id": "commercial_use",
+      "zh": "商业化/出售/变现",
+      "checks": [
+        {"item": "是否在遵守 GPL 义务的前提下出售（源码随附）", "rule": "GPL 允许收费，可收源码拷贝费", "level": "info"},
+        {"item": "是否以修改版整体保持开源作为前提", "rule": "GPL v3 §5(b)", "level": "must"},
+        {"item": "是否删除了作者版权/署名或声称完全原创", "rule": "禁止", "level": "must"},
+        {"item": "是否使用原项目商标/名称造成混淆", "rule": "GPL 不自动授权商标使用", "level": "warn"}
+      ],
+      "verdict": "conditional",
+      "zh_verdict": "可以商业化，但必须保持开源并履行全部 GPL 义务；建议先咨询执业律师"
+    },
+    {
+      "id": "combo_licenses",
+      "zh": "与其他许可证代码组合",
+      "checks": [
+        {"item": "MIT/BSD/Apache-2.0 代码并入 GPL 项目", "rule": "允许（permissive 兼容）", "level": "ok"},
+        {"item": "GPL 代码并入 MIT/闭源项目", "rule": "禁止：合并结果整体必须 GPL", "level": "must"},
+        {"item": "GPL-2.0-only 代码与 GPL-3.0 项目组合", "rule": "不兼容（v2-only 不能并入 v3-only）", "level": "must"},
+        {"item": "LGPL 库动态链接到闭源程序", "rule": "允许（弱 copyleft）", "level": "ok"}
+      ],
+      "verdict": "conditional",
+      "zh_verdict": "组合规则因许可证而异，逐条核对后决定"
+    }
+  ],
+  "audit_workflow": [
+    "1. 读取 LICENSE 文件/SPDX 标识，识别许可证与版本",
+    "2. 读取 README 与仓库说明，识别作者的使用限制声明（关键词库命中）",
+    "3. 按用户场景（自用/分发/SaaS/商用/组合）命中对应检查清单",
+    "4. 输出风险分级：🔴 高风险（禁止部署）/ 🟡 中风险（附条件部署）/ 🟢 低风险（可部署）",
+    "5. 生成中文审核报告（audit-report.md）落盘，供留存与打包带走",
+    "6. 部署按钮在风险 🔴 时强制禁用；🟡/🟢 需用户勾选'已阅读并同意合规要求'"
+  ],
+  "levels": {
+    "critical": {"zh": "🔴 严重违规", "deploy_allowed": false},
+    "high": {"zh": "🔴 高风险", "deploy_allowed": false},
+    "conditional": {"zh": "🟡 附条件", "deploy_allowed": true},
+    "medium": {"zh": "🟡 中风险", "deploy_allowed": true},
+    "low": {"zh": "🟢 低风险", "deploy_allowed": true},
+    "info": {"zh": "ℹ️ 提示", "deploy_allowed": true}
+  }
+}

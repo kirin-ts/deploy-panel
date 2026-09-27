@@ -1,0 +1,22 @@
+{
+  "name": "带Logo应用",
+  "components": [
+    {
+      "uid": "cnav1",
+      "compId": "c_nav",
+      "props": {
+        "logo": "uploads/1790493960368_46319887.png",
+        "title": "我的应用",
+        "bg": "深色"
+      }
+    },
+    {
+      "uid": "cimg1",
+      "compId": "c_image",
+      "props": {
+        "src": "uploads/1790493915030_6ae2d604.png",
+        "alt": "头像"
+      }
+    }
+  ]
+}
