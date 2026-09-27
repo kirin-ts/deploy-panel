@@ -2685,7 +2685,7 @@ function uaWebRender(r){
   items.forEach((it,i)=>{
     html+='<div class="ua-card" style="padding:8px;margin-top:6px">'+
       '<div style="font-size:13px;font-weight:600">'+esc(it.title)+'</div>'+
-      '<div style="color:var(--text2);font-size:12px;margin-top:2px">'+esc(it.domain)+((it.level===2)?'<span style="color:#4fd08a;margin-left:6px">视频平台</span>':(it.hint?'<span style="color:#d7b46a;margin-left:6px">相关网页</span>':''))+'</div>'+
+      '<div style="color:var(--text2);font-size:12px;margin-top:2px">'+esc(it.domain)+((it.level===2)?'<span style="color:#4fd08a;margin-left:6px">视频平台</span>':(it.level===1?'<span style="color:var(--text2);margin-left:6px">网页</span>':''))+'</div>'+
       '<div style="color:var(--text2);font-size:12px;margin-top:2px">'+esc(it.summary||"")+'</div>'+
       '<div style="display:flex;gap:6px;margin-top:6px">'+
       '<button class="btn btn-sm" style="border-color:#4fd08a;color:#4fd08a" onclick="uaWebPlay('+i+')">▶ 解析播放</button>'+

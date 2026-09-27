@@ -2086,10 +2086,21 @@ def _web_engine_site(kw, site):
 def _nofilter_on():
     return os.path.exists(os.path.join(DATA, ".nofilter"))
 
+def _is_video_url(low):
+    """视频特征判定（用于结果打标分级，不负责过滤）：命中免费视频平台白名单域名，
+    或 URL 含视频播放特征路径 → 视为视频内容。"""
+    if _WEB_VIDEO_DOMS and any(d in low for d in _WEB_VIDEO_DOMS):
+        return True
+    return any(k in low for k in ("/video/", "/play", "/bangumi/", "/v/", "bvid=",
+                                  "/av", "?modal", ".mp4", ".m3u8", "/videos?",
+                                  "video/", "tv.cctv", "yangshipin", "1905.com"))
+
+
 def _web_video_search(q, page=1):
     """全网视频搜索：多搜索引擎（Bing/百度/搜狗）并行抓取 → 融合去重 →
     按「视频平台域名 + 标题关键词」标记视频内容。仅公开网页，不采集个人隐私；
-    解析播放由 yt-dlp 尝试，需会员/付费的内容会明确提示失败。"""
+    解析播放由 yt-dlp 尝试，需会员/付费的内容会明确提示失败。
+    调试模式（过滤关）仍做视频/网页分级：真视频置顶标「视频平台」，小说/百科等标「网页」排后。"""
     kw = q.strip()
     if not kw:
         return {"ok": False, "error": "请输入关键词"}
@@ -2129,7 +2140,7 @@ def _web_video_search(q, page=1):
                 continue  # 解说/速看/小说/书评等非正片内容过滤
             if _WEB_VIDEO_DOMS and not any(d in low for d in _WEB_VIDEO_DOMS):
                 continue  # 非免费视频平台域名过滤（白名单为空=全部放行，不再按标题词判定）
-        lv = 2
+        lv = 2 if _is_video_url(low) else 1
         dom_cnt = {}
         for _x in items:
             dom_cnt[_x["domain"]] = dom_cnt.get(_x["domain"], 0) + 1
@@ -2137,7 +2148,7 @@ def _web_video_search(q, page=1):
             continue  # 同域名配额平衡：单站最多 10 条，配额让给更多来源（抖音片段大户降噪）
         items.append({"title": it["title"][:120], "url": url, "domain": dom[:40],
                       "summary": it["summary"][:160],
-                      "hint": True, "level": lv,
+                      "hint": lv >= 2, "level": lv,
                       "engine": it.get("engine", "必应/百度/搜狗/360")})
         if len(items) >= 30:
             break
