@@ -2434,8 +2434,12 @@ def _yt_playinfo(u):
             continue
         if not vc or vc == "none":
             continue
-        # 视频流：选最高清
-        if vpick is None or (f.get("height") or 0) > (vpick.get("height") or 0):
+        # 视频流：H264(avc1) 优先（浏览器可直接解码），其次选最高清
+        def _score(f_):
+            h = f_.get("height") or 0
+            v = f_.get("vcodec") or ""
+            return (1000000 if v.startswith("avc") else (500000 if "h264" in v else 0)) + h
+        if vpick is None or _score(f) > _score(vpick):
             vpick = f
     # 音频流：acodec 非 none，优选 aac/m4a
     apick = None
@@ -2460,7 +2464,8 @@ def _yt_playinfo(u):
     aurl = apick.get("url") if apick and apick.get("url") else ""
     return {"title": title, "url": vurl, "aurl": aurl,
             "ext": (vpick.get("ext") if vpick else (info.get("ext") or "")) or "",
-            "height": (vpick.get("height") if vpick else 0) or 0}
+            "height": (vpick.get("height") if vpick else 0) or 0,
+            "vcodec": (vpick.get("vcodec") if vpick else "") or ""}
 
 
 def _dl_ytdlp(u, ddir, prog=None, out_path=None, prefer_single=False):
@@ -2693,7 +2698,13 @@ def _play_worker(task):
             args += ["-headers", hdrs, "-i", aurl, "-map", "0:v", "-map", "1:a"]
         else:
             args += ["-map", "0:v", "-map", "0:a?"]
-        args += ["-c", "copy", "-movflags", "frag_keyframe+empty_moov", "-f", "mp4", out]
+        vc = (info.get("vcodec") or "").lower()
+        if vc and (vc.startswith("hvc") or vc.startswith("hev")):
+            # HEVC 浏览器无法直接解码 → 转码 H264（画质 veryfast，可播优先）
+            args += ["-c:v", "libx264", "-preset", "veryfast", "-crf", "23", "-pix_fmt", "yuv420p",
+                     "-c:a", "copy", "-movflags", "frag_keyframe+empty_moov", "-f", "mp4", out]
+        else:
+            args += ["-c", "copy", "-movflags", "frag_keyframe+empty_moov", "-f", "mp4", out]
         with open(logf, "wb") as lg:
             proc = subprocess.Popen(args, stdout=lg, stderr=lg)
         while proc.poll() is None:
