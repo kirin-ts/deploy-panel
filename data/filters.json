@@ -48,30 +48,7 @@
     "文库",
     "下载文档"
   ],
-  "video_doms": [
-    "bilibili.com",
-    "douyin.com",
-    "ixigua.com",
-    "weibo.com",
-    "kuaishou.com",
-    "acfun.cn",
-    "163.com",
-    "icourse163.org",
-    "mooc",
-    "study.163.com",
-    "open.163.com",
-    "youtube.com",
-    "vimeo.com",
-    "pearvideo.com",
-    "haokan.baidu.com",
-    "v.baidu.com",
-    "toutiao.com",
-    "cctv.com",
-    "cntv.cn",
-    "cnmooc",
-    "cloud.tencent.com/edu",
-    "1905.com"
-  ],
+  "video_doms": [],
   "paid_doms": [
     "v.qq.com",
     "iqiyi.com",
@@ -131,7 +108,9 @@
     "v.douyin.com",
     "v.kuaishou.com",
     "pearvideo.com",
-    "tv.cctv.com/videos"
+    "tv.cctv.com/videos",
+    "yangshipin.cn",
+    "tv.cctv.cn"
   ],
   "pirate_doms": []
 }

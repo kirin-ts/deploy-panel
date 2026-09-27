@@ -2130,6 +2130,11 @@ def _web_video_search(q, page=1):
             if not any(d in low for d in _WEB_VIDEO_DOMS):
                 continue  # 非免费视频平台域名过滤（不再按标题词判定，杜绝小说/解说/官网混入）
         lv = 2
+        dom_cnt = {}
+        for _x in items:
+            dom_cnt[_x["domain"]] = dom_cnt.get(_x["domain"], 0) + 1
+        if dom_cnt.get(dom, 0) >= 10:
+            continue  # 同域名配额平衡：单站最多 10 条，配额让给更多来源（抖音片段大户降噪）
         items.append({"title": it["title"][:120], "url": url, "domain": dom[:40],
                       "summary": it["summary"][:160],
                       "hint": True, "level": lv,
