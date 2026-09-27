@@ -2138,8 +2138,8 @@ def _web_video_search(q, page=1):
                 continue  # 付费/会员平台直接过滤，仅保留免费公开内容
             if any(k in it["title"] for k in _WEB_JUNK_TITLE):
                 continue  # 解说/速看/小说/书评等非正片内容过滤
-            if _WEB_VIDEO_DOMS and not any(d in low for d in _WEB_VIDEO_DOMS):
-                continue  # 非免费视频平台域名过滤（白名单为空=全部放行，不再按标题词判定）
+            if not _is_video_url(low):
+                continue  # 过滤开启=只保留视频特征结果：白名单域名或URL含播放路径；白名单之外有视频特征的网站同样保留，不再受定向白名单限制
         lv = 2 if _is_video_url(low) else 1
         dom_cnt = {}
         for _x in items:
