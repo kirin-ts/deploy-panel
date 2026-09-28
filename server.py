@@ -2979,15 +2979,33 @@ def api_url_resolve(self, params):
     try:
         _ci = _play_cache_get(u)
         if _ci is None:
+            # 并行竞速：yt-dlp（全站）与 HTML 正则兜底同时跑，先拿到直链即用；
+            # 避免 yt-dlp 慢时让用户干等完整超时（正则命中通常更快）
             _ci = None
+            _need_login_local = False
+            import concurrent.futures as _rcf
+            def _yt_job():
+                nonlocal _need_login_local
+                try:
+                    return _yt_playinfo_timed(u)
+                except Exception as _ee:
+                    if _need_login_hint(str(_ee)):
+                        _need_login_local = True
+                    return None
+            _rex = _rcf.ThreadPoolExecutor(max_workers=2)
+            _f1 = _rex.submit(_yt_job)
+            _f2 = _rex.submit(_web_extract_video, u)
             try:
-                _ci = _yt_playinfo_timed(u)
-            except Exception as _e:
-                if _need_login_hint(str(_e)):
-                    _need_login = True
-                _ci = None
-            if _ci is None:
-                _ci = _web_extract_video(u)
+                for _rf in _rcf.as_completed((_f1, _f2)):
+                    _r = _rf.result(timeout=15)
+                    if isinstance(_r, dict) and _r.get("url"):
+                        _ci = _r
+                        break
+            except Exception:
+                pass
+            _rex.shutdown(wait=False, cancel_futures=True)
+            if _need_login_local:
+                _need_login = True
             if _ci is not None:
                 _play_cache_put(u, info=_ci)
             else:
