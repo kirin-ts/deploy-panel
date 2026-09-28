@@ -2238,6 +2238,15 @@ def api_media_filters(body):
         _WEB_PIRATE_DOMS = tuple(_FILTERS["pirate_doms"])
     return {"ok": True, "filters": dict(_FILTERS)}
 
+def _pic_url(p):
+    """封面 URL 规范化：协议相对 -> https，http -> https"""
+    p = str(p or "").strip()
+    if p.startswith("//"):
+        return "https:" + p
+    if p.startswith("http://"):
+        return "https://" + p[7:]
+    return p
+
 def _bili_search(stype, q, page=1):
     """B站 wbi 公开搜索，返回 (items, ok)"""
     items = []
@@ -2265,14 +2274,17 @@ def _bili_search(stype, q, page=1):
             items.append({"platform": "B站", "kind": "video", "title": title,
                           "url": arcurl or ("https://www.bilibili.com/video/" + bvid),
                           "bv": bvid, "duration": dur_txt, "author": it.get("author") or "",
-                          "play": it.get("play") or 0})
+                          "play": it.get("play") or 0,
+                          "pic": _pic_url(it.get("pic"))})
         elif stype == "article":
             cid = it.get("id") or ""
             art_url = it.get("arcurl") or it.get("url") or (("https://www.bilibili.com/read/cv" + str(cid)) if cid else "")
             pub = str(it.get("pubdate") or it.get("pub_time") or "")[:10]
+            imgs = it.get("image_urls") or []
             items.append({"platform": "B站专栏", "kind": "article", "title": title,
                           "url": art_url, "bv": "", "duration": ((it.get("author") or "") + (" · " + pub if pub else "")),
-                          "author": it.get("author") or "", "play": it.get("view") or 0})
+                          "author": it.get("author") or "", "play": it.get("view") or 0,
+                          "pic": _pic_url(imgs[0] if isinstance(imgs, list) and imgs else "")})
         elif stype == "live":
             roomid = it.get("roomid") or ""
             online = it.get("online") or 0
@@ -2286,7 +2298,8 @@ def _bili_search(stype, q, page=1):
             items.append({"platform": "B站番剧", "kind": "bangumi", "title": title,
                           "url": ("https://www.bilibili.com/bangumi/play/ss" + str(sid)) if sid else (("https://www.bilibili.com/bangumi/media/md" + str(mid)) if mid else ""),
                           "bv": "", "duration": ",".join((it.get("areas") or [])[:2]),
-                          "author": it.get("type_name") or "", "play": it.get("order") or 0})
+                          "author": it.get("type_name") or "", "play": it.get("order") or 0,
+                          "pic": _pic_url(it.get("cover") or it.get("pic"))})
     return items, True
 
 

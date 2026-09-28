@@ -331,6 +331,7 @@ input:focus,textarea:focus{outline:none;border-color:var(--accent)}
 .mc-chipbar{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;align-items:center;background:var(--bg,#fff);border:1px solid var(--line,#e5e7eb);border-radius:10px;padding:7px 10px}
 .mc-chipbar .lbl{color:var(--text2);font-size:12px}
 
+.mc-img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:inherit}
 .mc-navchips{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;align-items:center}
 .mc-navchips .lbl{color:var(--text2);font-size:12px}
 .mc-feat{grid-column:span 2}
@@ -601,6 +602,7 @@ input:focus,textarea:focus{outline:none;border-color:var(--accent)}
           <div id="m-bresults" class="mc-grid"></div>
           <div class="mc-sec"><span class="ico" style="background:#7c4dff">🖼</span> 漫画站点（仅公开免费章节）</div>
           <div id="m-comic-sites" class="mc-grid" style="margin-top:8px"></div>
+          <div class="mc-sec" id="mc-sec-reader"><span class="ico" style="background:#ff5f6d">📖</span> 漫画/小说阅读器（粘贴链接站内直接阅读/翻页）</div>
           <div class="mc-search" style="flex-wrap:wrap">
             <input id="m-comic-url" class="input" placeholder="或粘贴漫画/图集页 URL（提取图片翻页）" style="flex:1;min-width:240px">
             <button class="btn btn-primary" onclick="mComicLoad()">看图</button>
@@ -2739,11 +2741,13 @@ async function uaVSearch(){
   uaVRender();
 }
 /* ===== 媒体中心 · 主流卡片渲染助手 ===== */
-function _mcCover(ph, dur, cls){
+function _mcCover(ph, dur, cls, img){
   const ch=((ph||"?").charCodeAt(0)||36)%360;
+  const cover=img?'<img class="mc-img" src="'+esc(img)+'" loading="lazy" alt="" referrerpolicy="no-referrer" onerror="this.remove()">':'';
   return '<div class="mc-cover" style="--c1:hsl('+ch+',46%,40%);--c2:hsl('+((ch+45)%360)+',46%,27%)">'+
+    cover+
     (cls?'<span class="mc-badge">'+esc(cls)+'</span>':'')+
-    '<div class="ph">'+esc(ph)+'</div>'+
+    (img?'':'<div class="ph">'+esc(ph)+'</div>')+
     (dur?'<span class="mc-dur">'+esc(dur)+'</span>':'')+
     '<span class="mc-playic">▶</span></div>';
 }
@@ -2757,7 +2761,7 @@ function uaWebRender(r){
     const d=(it.domain||"").replace(/^www\./,"")||"网页";
     const ph=(it.title||"?").trim().slice(0,1)||"?";
     html+='<div class="mc-card">'+
-      _mcCover(ph, "", (it.level===2?"视频平台":"网页"))+
+      _mcCover(ph, "", (it.level===2?"视频平台":"网页"), it.pic)+
       '<div class="mc-body"><div class="mc-title">'+esc(it.title)+'</div>'+
       '<div class="mc-meta"><span>'+esc(d)+'</span></div>'+
       '<div class="mc-acts">'+
@@ -2829,7 +2833,7 @@ function uaVRender(){
         acts+='<button class="btn btn-sm" style="border-color:#d0a64f;color:#d0a64f" onclick="uaVEps('+gi+')">分集/分P</button>';
       }
       html+='<div class="mc-card'+(i===0?' mc-feat':'')+'">'+
-        _mcCover(ph, it.duration, it.platform)+
+        _mcCover(ph, it.duration, it.platform, it.pic)+
         '<div class="mc-body"><div class="mc-title">'+esc(it.title)+'</div>'+
         '<div class="mc-meta"><span>'+meta+'</span>'+(it.play?'<span class="pl">▶ '+esc(it.play)+'</span>':'')+'</div>'+
         '<div class="mc-acts">'+acts+'</div>'+
@@ -2984,12 +2988,13 @@ const _M_SITES=[["动漫之家","https://manhua.dmzj.com/","#ff5f6d","#ffc371","
 function mRenderSites(){
   const box=$("#m-comic-sites"); if(!box)return;
   if(box.children.length)return;
-  box.innerHTML=_M_SITES.map(st=>'<div class="mc-card mc-site-card">'+
+  box.innerHTML=_M_SITES.map((st,i)=>'<div class="mc-card mc-site-card">'+
     '<div class="mc-cover" style="aspect-ratio:3/4;--c1:'+st[2]+';--c2:'+st[3]+'">'+
       '<span class="mc-badge">漫画站</span><div class="ph" style="font-size:40px">'+st[4]+'</div>'+
-      '<span class="mc-playic" style="font-size:13px">进入</span></div>'+
+      '<span class="mc-playic" style="font-size:13px">阅读</span></div>'+
     '<div class="mc-body"><div class="mc-title">'+esc(st[0])+'</div>'+
-    '<div class="mc-acts"><button class="btn btn-sm btn-primary" style="flex:1" onclick="mOpenSite(\''+st[1]+'\')">进入浏览</button></div></div></div>').join("");
+    '<div class="mc-acts"><button class="btn btn-sm btn-primary" style="flex:1" onclick="mComicReadBySite('+i+')">粘贴地址阅读</button>'+
+    '<button class="btn btn-sm" style="border-color:var(--text2);color:var(--text2)" onclick="mOpenSite(\''+st[1]+'\')" title="新标签打开站点">↗</button></div></div></div>').join("");
 }
 /* 频道导航 */
 function mNav(k){
@@ -3012,6 +3017,7 @@ async function mSearch(){
       const ph=(it.platform||"♪").trim().slice(0,1)||"♪";
       const meta=(it.author?esc(it.author):"-")+(it.duration?(' · '+esc(it.duration)):'');
       return '<div class="mc-card"><div class="mc-cover" style="aspect-ratio:1/1;--c1:hsl('+((i*57)%360)+',42%,38%);--c2:hsl('+(((i*57)+50)%360)+',42%,26%)">'+
+        (it.pic?'<img class="mc-img" src="'+esc(it.pic)+'" loading="lazy" alt="" referrerpolicy="no-referrer" onerror="this.remove()">':'')+
         '<span class="mc-badge">'+esc(it.platform||"音乐")+'</span>'+
         '<div class="ph" style="font-size:34px">♪</div>'+
         '<span class="mc-playic">▶</span></div>'+
@@ -3025,11 +3031,28 @@ function mPlayEx(i){
   const a=$("#m-audio"); a.pause(); a.src=""; a.onerror=null;
   const now=$("#m-now"); if(now)now.textContent="♪ 正在播放："+it.title+" · "+it.author;
   if(mTmp){api("url/play_clean",{path:mTmp}).then(()=>{});mTmp=null;}
-  toast("点开即播…（流式代理）");
-  a.onerror=()=>{ a.onerror=null; a.src=""; toast("流式播放失败，改用完整下载模式…"); mPlay(i); };
+  toast("点开即播…（先取直链，失败自动降级）");
+  // 优先直链直连（最快）：先 playinfo（带缓存），命中音频直链则浏览器直连
+  api("url/playinfo",{url:it.url}).then(info=>{
+    if(info && info.ok && info.url){
+      const low=(""+info.url).toLowerCase();
+      const audioExt=/\.(mp3|m4a|aac|oga|ogg|flac|wav|opus|mp4)(\?|$)/.test(low);
+      const kind=(info.kind||"")+" "+(info.ext||"");
+      if(audioExt || kind.indexOf("audio")>=0 || kind.indexOf("direct")>=0){
+        a.onerror=null; a.src=info.url; a.play().catch(()=>{});
+        setTimeout(()=>{ if(!a.paused || a.readyState>=2) return; a.onerror=null; a.src=""; toast("直连超时，改用流式代理…"); mPlayStream(it); },8000);
+        return;
+      }
+    }
+    mPlayStream(it);
+  }).catch(()=>mPlayStream(it));
+}
+function mPlayStream(it){
+  const a=$("#m-audio");
+  a.onerror=()=>{ a.onerror=null; a.src=""; toast("流式播放失败，改用完整下载模式…"); mPlay(mItems.indexOf(it)); };
   a.src="api/url/play?url="+encodeURIComponent(it.url);
   a.play().catch(()=>{});
-  setTimeout(()=>{ if(!a.paused || a.readyState>=2) return; a.onerror=null; a.src=""; toast("流式加载超时，改用完整下载模式…"); mPlay(i); },15000);
+  setTimeout(()=>{ if(!a.paused || a.readyState>=2) return; a.onerror=null; a.src=""; toast("流式加载超时，改用完整下载模式…"); mPlay(mItems.indexOf(it)); },15000);
 }
 async function mPlay(i){
   const it=(mItems||[])[i]; if(!it)return;
@@ -3059,6 +3082,15 @@ function mFont(d){const el=$("#m-read-body");let s=parseInt(el.style.fontSize||1
 /* ===== 媒体中心 · 小说/漫画 ===== */
 let mComicImgs=[], mComicIdx=0, mFontSz=15;
 function mBSug(t){$("#m-bq").value=t;mBSearch();}
+function mComicReadBySite(i){
+  const st=_M_SITES[i]; if(!st)return;
+  const u=prompt("粘贴「"+st[0]+"」漫画/图集详情页 URL（仅公开免费章节，站内直接翻页阅读）：\n示例 "+st[1]);
+  if(!u||!u.trim())return;
+  const inp=$("#m-comic-url"); if(inp)inp.value=u.trim();
+  const sec=document.getElementById("mc-sec-reader");
+  if(sec)sec.scrollIntoView({behavior:"smooth",block:"start"});
+  mComicLoad();
+}
 function mOpenSite(u){window.open(u,"_blank");}
 async function mBSearch(){
   const q=$("#m-bq").value.trim();
@@ -3070,6 +3102,7 @@ async function mBSearch(){
   const its=r.items||[];
   box.innerHTML='<div style="grid-column:1/-1;color:var(--text2);font-size:12px">找到 '+its.length+' 条公开内容（来源：'+(r.sources||[]).join("/")+'）</div>'+
     its.map((it,i)=>'<div class="mc-card"><div class="mc-cover" style="aspect-ratio:3/4;--c1:#6f4e37;--c2:#4a3226">'+
+      (it.pic?'<img class="mc-img" src="'+esc(it.pic)+'" loading="lazy" alt="" referrerpolicy="no-referrer" onerror="this.remove()">':'')+
       '<span class="mc-badge">'+esc(it.platform||"小说")+'</span>'+
       '<div class="ph" style="font-size:40px">📖</div>'+
       '<span class="mc-playic" style="font-size:13px">阅读</span></div>'+
