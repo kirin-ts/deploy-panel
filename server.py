@@ -2118,11 +2118,6 @@ def _web_video_search(q, page=1):
             raw += eng(kw)
         except Exception:
             pass
-    for site in _WEB_FREE_SITES:
-        try:
-            raw += _web_engine_site(kw, site)
-        except Exception:
-            pass
     # 融合去重（按 URL，百度跳转链接去 query 尾参后再去重）
     seen, items = set(), []
     for it in raw:
