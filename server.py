@@ -2274,6 +2274,25 @@ def _web_video_search(q, page=1):
             raw += eng(kw)
         except Exception:
             pass
+    # 免费公开站定向直搜（央视/电影网/公开课/慕课/梨视频等），提升非 B站来源的正片召回
+    _free_search_sites = ("tv.cctv.com", "jishi.cctv.com", "1905.com",
+                          "open.163.com", "icourse163.org", "pearvideo.com")
+
+    def _site_one(_st):
+        try:
+            return _web_engine_site(kw, _st)
+        except Exception:
+            return []
+    try:
+        from concurrent.futures import ThreadPoolExecutor as _TPE
+        with _TPE(max_workers=min(4, len(_free_search_sites))) as _ex:
+            for _res in _ex.map(_site_one, _free_search_sites):
+                if _res:
+                    for _it in _res:
+                        _it["engine"] = "免费站直搜"
+                    raw += _res
+    except Exception:
+        pass
     # 融合去重（按 URL，百度跳转链接去 query 尾参后再去重）
     seen, items = set(), []
     for it in raw:
