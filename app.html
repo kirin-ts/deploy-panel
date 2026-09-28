@@ -3008,28 +3008,46 @@ function mNav(k){
   if(el)el.scrollIntoView({behavior:"smooth",block:"center"});
 }
 function mBNav(t){$("#m-bq").value=t;mBSearch();}
-function mSug(t){$("#m-q").value=t;mSearch();}
-async function mSearch(){
+function mSug(t){$("#m-q").value=t;mSearch(true);}
+function _durSec(d){
+  if(!d)return 0;
+  const m=(""+d).match(/(\d+):(\d+)(?::(\d+))?/);
+  if(m){return parseInt(m[1],10)*60+parseInt(m[2],10)+(m[3]?parseInt(m[3],10)*3600:0);}
+  const n=parseInt(""+d,10);return isNaN(n)?0:n;
+}
+async function mSearch(autoPlay){
   const q=$("#m-q").value.trim();
   if(!q){toast("请输入歌名/歌手");return;}
   const box=$("#m-results");
   box.innerHTML='<div style="grid-column:1/-1;color:var(--text2);font-size:12px">搜索中…</div>';
-  const r=await api("video/search",{q:q});
+  const r=await api("video/search",{q:q,source:"video"});
   if(!r.ok){box.innerHTML='<div style="grid-column:1/-1;color:#e07b7b;font-size:12px">'+(r.error||"搜索失败")+'</div>';return;}
-  mItems=r.items||[];
-  box.innerHTML='<div style="grid-column:1/-1;color:var(--text2);font-size:12px">找到 '+mItems.length+' 条公开内容（来源：'+(r.sources||[]).join("/")+'）</div>'+
+  let its=r.items||[];
+  // 音乐场景：短于 60s 的视为短视频/预览（盘点、预告、片段），排到末尾并加角标；完整歌曲优先
+  its=its.map(it=>({it:it,s:_durSec(it.duration)}));
+  its.sort((a,b)=>{
+    const ga=a.s>=60?1:0, gb=b.s>=60?1:0;
+    if(ga!==gb)return gb-ga;
+    if(a.s!==b.s)return b.s-a.s;
+    return 0;
+  });
+  its=its.map(x=>x.it);
+  mItems=its;
+  box.innerHTML='<div style="grid-column:1/-1;color:var(--text2);font-size:12px">找到 '+mItems.length+' 条公开内容（完整歌曲优先，短视频已置底：来源'+(r.sources||[]).join("/")+'）</div>'+
     mItems.map((it,i)=>{
       const ph=(it.platform||"♪").trim().slice(0,1)||"♪";
       const meta=(it.author?esc(it.author):"-")+(it.duration?(' · '+esc(it.duration)):'');
+      const short=_durSec(it.duration)>0 && _durSec(it.duration)<60;
       return '<div class="mc-card"><div class="mc-cover" style="aspect-ratio:1/1;--c1:hsl('+((i*57)%360)+',42%,38%);--c2:hsl('+(((i*57)+50)%360)+',42%,26%)">'+
         (it.pic?'<img class="mc-img" src="'+esc(it.pic)+'" loading="lazy" alt="" referrerpolicy="no-referrer" onerror="this.remove()">':'')+
         '<span class="mc-badge">'+esc(it.platform||"音乐")+'</span>'+
         '<div class="ph" style="font-size:34px">♪</div>'+
         '<span class="mc-playic">▶</span></div>'+
-        '<div class="mc-body"><div class="mc-title">'+esc(it.title)+'</div>'+
+        '<div class="mc-body"><div class="mc-title">'+esc(it.title)+(short?' <span style="color:#d0a64f;font-size:11px">短视频</span>':'')+'</div>'+
         '<div class="mc-meta"><span>'+meta+'</span></div>'+
         '<div class="mc-acts"><button class="btn btn-sm" style="border-color:#4fd08a;color:#4fd08a;flex:1" onclick="mPlayEx('+i+')">▶ 播放</button></div></div></div>';
     }).join("");
+  if(autoPlay && mItems.length){ mPlayEx(0); }
 }
 function mPlayEx(i){
   const it=(mItems||[])[i]; if(!it)return;

@@ -2352,7 +2352,10 @@ def api_video_search(params):
             return ("web", its, True)
         except Exception:
             return ("web", [], False)
-    jobs = [lambda st=st: _run_bili(st) for st in want] + [_run_web]
+    jobs = [lambda st=st: _run_bili(st) for st in want]
+    # 音乐(source=video)与小说(source=article)场景只走B站定向，跳过全网网页通道，避免百科/词典/问答等非视频内容混入
+    if src in ("all", "bangumi", "live"):
+        jobs.append(_run_web)
     with _cf.ThreadPoolExecutor(max_workers=min(5, len(jobs))) as ex:
         futs = [ex.submit(f) for f in jobs]
         for f in _cf.as_completed(futs):
