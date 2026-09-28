@@ -3170,7 +3170,17 @@ def api_url_resolve(self, params):
             _need_login = bool(_ci.get("need_login"))
             _ci = None
         if not (isinstance(_ci, dict) and _ci.get("url")):
-            _bc = _browser_capture(u)
+            # 央视/央视频专用通道：竞速未命中时再走 yt-dlp 直提（该系页面正则难命中，
+            # 但 yt-dlp 对 tv.cctv/jishi.cctv/yangshipin 提取稳定，播放/下载链路同源）
+            if "cctv" in _host or "yangshipin" in _host:
+                try:
+                    _ci_cctv = _yt_playinfo(u)
+                    if isinstance(_ci_cctv, dict) and _ci_cctv.get("url"):
+                        _ci = _ci_cctv
+                        _play_cache_put(u, info=_ci)
+                except Exception:
+                    _ci = None
+            _bc = _browser_capture(u) if not (isinstance(_ci, dict) and _ci.get("url")) else None
             if _bc and _bc.get("url"):
                 _ci = {"url": _bc["url"], "kind": _bc.get("kind"), "ref": _bc.get("ref", ""), "title": _bc.get("title", "")}
                 _play_cache_put(u, info=_ci)
