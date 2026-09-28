@@ -1799,9 +1799,25 @@ def api_media_episodes(params):
                 eps.append({"index": e.get("title") or str(epid), "title": e.get("long_title") or e.get("title") or "",
                             "dur": dur_txt, "url": ("https://www.bilibili.com/bangumi/play/ep" + str(epid)) if epid else ""})
         elif kind == "video":
-            bv = str(params.get("bvid") or "")
+            bv = str(params.get("bvid") or "").strip()
+            u = str(params.get("url") or "").strip()
             if not bv:
-                return {"ok": False, "error": "缺少 bvid"}
+                m = re.search(r"(BV[0-9A-Za-z]{10}|av\d+)", u)
+                if m:
+                    bv = m.group(1)
+            if not bv and "b23.tv" in u:
+                # b23.tv 短链：跟随重定向取最终视频页 URL 提取 BV/av
+                try:
+                    _req = urllib.request.Request(u, headers=hd)
+                    _resp = urllib.request.urlopen(_req, timeout=15)
+                    _final = _resp.geturl()
+                    _m2 = re.search(r"(BV[0-9A-Za-z]{10}|av\d+)", _final)
+                    if _m2:
+                        bv = _m2.group(1)
+                except Exception:
+                    pass
+            if not bv:
+                return {"ok": False, "error": "缺少 bvid（仅支持 bilibili.com/video 链接的分集）"}
             html = _fetch_page("https://www.bilibili.com/video/" + bv)
             m = re.search(r'"pages":(\[.*?\])(?=[,}])', html, re.S)
             if not m:
