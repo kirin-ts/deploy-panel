@@ -3915,6 +3915,7 @@ def _dl_worker(task):
     with _DL_LOCK:
         task["results"] = results
         task["done"] = True
+        task["ts_done"] = time.time()
         task["ok_count"] = sum(1 for r in results if r.get("ok"))
 
 
@@ -3946,6 +3947,9 @@ def api_url_dl_start(params):
 def api_url_dl_tasks(params):
     """下载任务面板：进行中任务 + 最近完成结果（含失败原因）"""
     with _DL_LOCK:
+        _now = time.time()
+        for _tid in [t for t, tk in list(_DL_TASKS.items()) if tk.get("done") and _now - (tk.get("ts_done") or 0) > 300]:
+            _DL_TASKS.pop(_tid, None)
         running, done = [], []
         for tid, t in _DL_TASKS.items():
             d = dict(t)

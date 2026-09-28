@@ -2459,6 +2459,11 @@ async function dlActivePoll(){
   if(dones.length) dlRefresh();
   setTimeout(dlActivePoll,1500);
 }
+function _dlThumb(f){
+  const ext=(f.path.split(".").pop()||"").toLowerCase();
+  if(!["png","jpg","jpeg","gif","webp","bmp","ico"].includes(ext))return '';
+  return '<img src="/api/url/preview?path='+encodeURIComponent(f.path)+'" style="width:38px;height:38px;object-fit:cover;border-radius:6px;flex:none" referrerpolicy="no-referrer" onerror="this.remove()">';
+}
 async function dlRefresh(){
   $("#dl-files").innerHTML='<span style="color:var(--text2);font-size:12px">加载中…</span>';
   const r=await api("url/dl_files",{});
@@ -2474,6 +2479,7 @@ async function dlRefresh(){
     return '<div style="display:flex;gap:10px;align-items:center;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px 12px;font-size:12.5px">'
       +'<input type="checkbox" class="dl-chk" data-path="'+encodeURIComponent(f.path)+'" onchange="dlSelChanged()" style="flex:none">'
       +'<span style="color:var(--text2);min-width:26px">'+(i+1)+'</span>'
+      +_dlThumb(f)
       +'<svg viewBox="0 0 24 24" width="15" height="15" style="flex:none"><path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M5 21h14"/></svg>'
       +'<span style="word-break:break-all;flex:1;color:var(--accent);font-size:12.5px">'+esc(rel.slice(rel.indexOf("downloads")))+'</span>'
       +'<span style="flex:1;word-break:break-all;color:#8b949e;font-size:11px;min-width:0" title="'+esc(f.url||'')+'">来源: '+(f.url?esc(f.url.slice(0,110)):'<i style="color:#6e7681">未记录（历史文件）</i>')+'</span>'
@@ -2738,6 +2744,7 @@ async function uaVSearch(){
   if(!r.ok){box.innerHTML='<span style="color:#e07b7b;font-size:12px">'+(r.error||"搜索失败")+'</span>';return;}
   if(window._uaVSource==="web"){uaWebRender(r);return;}
   window._uaVItems=r.items||[];
+  {const _s=new Set(); window._uaVItems=window._uaVItems.filter(it=>{const _u=it.url||""; if(!_u||_s.has(_u))return false; _s.add(_u); return true;});}
   window._uaVTags=r.tags||[];
   window._uaVTag="";
   // 分类筛选 chips
@@ -3023,6 +3030,8 @@ async function mSearch(autoPlay){
   const r=await api("video/search",{q:q,source:"video"});
   if(!r.ok){box.innerHTML='<div style="grid-column:1/-1;color:#e07b7b;font-size:12px">'+(r.error||"搜索失败")+'</div>';return;}
   let its=r.items||[];
+  // 同 URL 兜底去重（服务端已融合去重，前端再拦一层）
+  {const _s=new Set(); its=its.filter(it=>{const _u=it.url||""; if(!_u||_s.has(_u))return false; _s.add(_u); return true;});}
   // 音乐场景：短于 60s 的视为短视频/预览（盘点、预告、片段），排到末尾并加角标；完整歌曲优先
   its=its.map(it=>({it:it,s:_durSec(it.duration)}));
   its.sort((a,b)=>{
