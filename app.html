@@ -303,6 +303,33 @@ input:focus,textarea:focus{outline:none;border-color:var(--accent)}
 .ua-dl-item input{accent-color:var(--accent)}
 .ua-rec:hover{border-color:var(--accent)}
 .ua-hot{font-size:10px;background:var(--accent);color:#fff;padding:1px 6px;border-radius:8px}
+
+/* ===== 媒体中心 · 主流市场卡片风格 ===== */
+.mc-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(196px,1fr));gap:12px;margin-top:10px}
+.mc-card{position:relative;background:var(--bg2);border:1px solid var(--line);border-radius:12px;overflow:hidden;transition:box-shadow .18s,transform .18s}
+.mc-card:hover{box-shadow:0 8px 24px #00000030;transform:translateY(-2px);border-color:var(--accent55,#2f6bff55)}
+.mc-cover{position:relative;aspect-ratio:16/9;overflow:hidden;display:flex;align-items:center;justify-content:center}
+.mc-cover .ph{width:100%;height:100%;display:flex;align-items:center;justify-content:center;color:#fffd;font-size:30px;font-weight:700;background:linear-gradient(135deg,var(--c1,#3b5bdb),var(--c2,#7048e8))}
+.mc-cover img{width:100%;height:100%;object-fit:cover}
+.mc-dur{position:absolute;right:6px;bottom:6px;background:#000a;color:#fff;font-size:10px;padding:1px 6px;border-radius:4px}
+.mc-playic{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:42px;height:42px;border-radius:50%;background:#ffffff2b;border:1px solid #ffffff66;display:flex;align-items:center;justify-content:center;color:#fff;font-size:16px;opacity:0;transition:opacity .18s}
+.mc-card:hover .mc-playic{opacity:1}
+.mc-body{padding:8px 10px}
+.mc-title{font-size:13px;font-weight:600;line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:37px;word-break:break-all}
+.mc-meta{font-size:11px;color:var(--text2);margin-top:5px;display:flex;justify-content:space-between;align-items:center;gap:6px;word-break:break-all}
+.mc-acts{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap}
+.mc-badge{position:absolute;left:6px;top:6px;background:#000a;color:#fff;font-size:10px;padding:1px 7px;border-radius:6px;z-index:2}
+.mc-search{display:flex;gap:8px;margin-top:10px}
+.mc-search input{flex:1;padding:11px 16px;font-size:15px;border-radius:12px;border:1px solid var(--line,#e5e7eb);background:var(--bg,#fff);color:var(--text);outline:none;transition:box-shadow .15s,border-color .15s;min-width:0}
+.mc-search input:focus{border-color:var(--accent,#2f6bff);box-shadow:0 0 0 3px var(--accent22,#2f6bff22)}
+.mc-search button{flex:none;padding:11px 22px;font-size:14px;border-radius:12px}
+.mc-hot{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;align-items:center}
+.mc-hot .lbl{color:var(--text2);font-size:12px;line-height:24px}
+.mc-playerbar{position:sticky;bottom:0;margin-top:12px;background:var(--bg2);border:1px solid var(--line);border-radius:12px;padding:10px 12px;box-shadow:0 -4px 16px #00000010;z-index:5}
+.mc-playerbar audio{width:100%}
+.mc-sec{font-size:15px;font-weight:700;display:flex;align-items:center;gap:6px;margin:14px 0 4px}
+.mc-chipbar{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;align-items:center;background:var(--bg,#fff);border:1px solid var(--line,#e5e7eb);border-radius:10px;padding:7px 10px}
+.mc-chipbar .lbl{color:var(--text2);font-size:12px}
 #ua-script-pre,#ua-out-pre{overflow:auto;background:#0b0e13;border:1px solid var(--line);border-radius:8px;padding:12px;font-family:Consolas,Menlo,monospace;font-size:12px;line-height:1.6;color:#d8dee9;white-space:pre;margin-top:8px;max-height:46vh}
 </style>
 </head>
@@ -469,108 +496,101 @@ input:focus,textarea:focus{outline:none;border-color:var(--accent)}
     <!-- 媒体中心 -->
     <section id="view-media" class="hidden">
       <div class="ua-wrap">
-        <div style="display:flex;gap:6px;margin-bottom:10px;border-bottom:1px solid var(--line);padding-bottom:8px;flex-wrap:wrap;align-items:center">
-          <button class="btn btn-sm mt-tab-btn" data-tab="video" onclick="mtTab('video',this)" style="border-color:var(--accent);color:var(--accent);background:var(--accent11,#eaf1ff)">视频聚合</button>
-          <button class="btn btn-sm mt-tab-btn" data-tab="music" onclick="mtTab('music',this)">公开音乐</button>
-          <button class="btn btn-sm mt-tab-btn" data-tab="book" onclick="mtTab('book',this)">漫画 / 小说</button>
+        <div style="display:flex;gap:8px;margin-bottom:12px;align-items:center;flex-wrap:wrap;background:var(--bg2);border:1px solid var(--line);border-radius:12px;padding:9px 14px">
+          <b style="font-size:15px">媒体中心</b>
+          <span style="font-size:11px;color:var(--text2)">仅公开/免费内容 · 无广告弹窗</span>
           <span style="flex:1"></span>
-          <span style="font-size:11px;color:var(--text2)">仅公开/免费内容 · 付费会员内容不索引</span>
-          <button id="ua-filter-btn" class="btn btn-ghost btn-sm" onclick="uaToggleFilter()" style="font-size:11px;margin-left:6px" title="内容过滤开关：开=黑白名单全部生效（可屏蔽/放行指定网站）；关=调试模式，黑白名单不生效，显示全部搜索结果">过滤：…</button>
-          <button class="btn btn-ghost btn-sm" onclick="uaOpenFilterCfg()" style="font-size:11px;margin-left:4px" title="编辑过滤黑白名单，全部由你掌控">过滤配置</button>
+          <button class="btn btn-sm mt-tab-btn" data-tab="video" onclick="mtTab('video',this)" style="border-color:var(--accent);color:var(--accent);background:var(--accent11,#eaf1ff)">🎬 视频</button>
+          <button class="btn btn-sm mt-tab-btn" data-tab="music" onclick="mtTab('music',this)">🎵 音乐</button>
+          <button class="btn btn-sm mt-tab-btn" data-tab="book" onclick="mtTab('book',this)">📚 漫画/小说</button>
+          <button id="ua-filter-btn" class="btn btn-ghost btn-sm" onclick="uaToggleFilter()" style="font-size:11px" title="内容过滤开关：开=黑白名单全部生效；关=调试模式，黑白名单不生效">过滤：…</button>
+          <button class="btn btn-ghost btn-sm" onclick="uaOpenFilterCfg()" style="font-size:11px" title="编辑过滤黑白名单，全部由你掌控">过滤配置</button>
         </div>
         <div id="mt-panel-video">
-        <div class="ua-card">
-          <b>🎬 公开视频聚合搜索</b>
-          <div style="display:flex;gap:6px;margin-top:8px">
-            <input id="ua-vq" class="input" placeholder="输入关键词，如：机器学习 入门" style="flex:1">
-            <button class="btn btn-primary btn-sm" onclick="uaVSearch()">搜索</button>
+        <div class="ua-card" style="border-radius:12px">
+          <div class="mc-search">
+            <input id="ua-vq" class="input" placeholder="搜全网公开视频：纪录片 / 公开课 / 电影 / 剧集…">
+            <button class="btn btn-primary" onclick="uaVSearch()">🔍 搜索</button>
           </div>
-          <div id="ua-vq-sug" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px">
-            <span style="color:var(--text2);font-size:12px;line-height:24px">热门：</span>
+          <div id="ua-vq-sug" class="mc-hot">
+            <span class="lbl">热门：</span>
             <button class="btn btn-ghost btn-sm" onclick="uaVQ('公开课')">公开课</button>
             <button class="btn btn-ghost btn-sm" onclick="uaVQ('教程')">教程</button>
             <button class="btn btn-ghost btn-sm" onclick="uaVQ('纪录片')">纪录片</button>
             <button class="btn btn-ghost btn-sm" onclick="uaVQ('前端')">前端</button>
             <button class="btn btn-ghost btn-sm" onclick="uaVQ('Python')">Python</button>
+            <button class="btn btn-ghost btn-sm" onclick="uaVQ('航拍中国')">航拍中国</button>
           </div>
-          <div id="ua-vsrcs" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;align-items:center;background:var(--bg,#fff);border:1px solid var(--line,#e5e7eb);border-radius:8px;padding:6px 10px">
-            <span style="color:var(--text2);font-size:12px">平台：</span>
+          <div id="ua-vsrcs" class="mc-chipbar">
+            <span class="lbl">平台：</span>
             <button class="btn btn-ghost btn-sm" data-src="all" onclick="uaVSource('all',this)">全平台</button>
             <button class="btn btn-ghost btn-sm" data-src="video" onclick="uaVBili(this)">B站·视频</button>
             <button class="btn btn-ghost btn-sm" data-src="web" onclick="uaVSource('web',this)">全网</button>
           </div>
-          <div style="font-size:11px;color:var(--text3,#6e7681);margin-top:4px;line-height:1.6">平台筛选与上方「过滤」开关联动：选具体平台=定向搜索该站；「全平台 / 全网」受你配置的黑白名单控制。点「B站」可在 视频 / 直播 / 番剧 之间切换。</div>
-          <div id="ua-vtags" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;align-items:center"></div>
-          <div id="ua-vresults" style="margin-top:8px;display:flex;flex-direction:column;gap:6px"></div>
+          <div style="font-size:11px;color:var(--text3,#6e7681);margin-top:4px;line-height:1.6">平台筛选与「过滤」开关联动：选具体平台=定向搜索该站；「全平台 / 全网」受你配置的黑白名单控制。点「B站」可在 视频 / 直播 / 番剧 之间切换。</div>
+          <div id="ua-vtags" class="mc-hot"></div>
+          <div id="ua-vresults" class="mc-grid"></div>
         </div>
         </div>
         <div id="mt-panel-music" class="hidden">
-        <div class="ua-card">
-          <b>🎵 公开音乐（B站公开音频 · 仅公开/免费内容）</b>
-          <div style="display:flex;gap:6px;margin-top:8px">
-            <input id="m-q" class="input" placeholder="输入歌名 / 歌手，如：周杰伦 晴天" style="flex:1">
-            <button class="btn btn-primary btn-sm" onclick="mSearch()">搜索</button>
+        <div class="ua-card" style="border-radius:12px">
+          <div class="mc-search">
+            <input id="m-q" class="input" placeholder="搜音乐：歌名 / 歌手，如：周杰伦 晴天">
+            <button class="btn btn-primary" onclick="mSearch()">🔍 搜索</button>
           </div>
-          <div id="m-sug" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;align-items:center">
-            <span style="color:var(--text2);font-size:12px;line-height:24px">音乐热榜：</span>
+          <div id="m-sug" class="mc-hot">
+            <span class="lbl">音乐热榜：</span>
             <button class="btn btn-ghost btn-sm" onclick="mSug('周杰伦 晴天')">周杰伦 晴天</button>
             <button class="btn btn-ghost btn-sm" onclick="mSug('稻香')">稻香</button>
             <button class="btn btn-ghost btn-sm" onclick="mSug('起风了')">起风了</button>
             <button class="btn btn-ghost btn-sm" onclick="mSug('孤勇者')">孤勇者</button>
             <button class="btn btn-ghost btn-sm" onclick="mSug('平凡之路')">平凡之路</button>
-            <button class="btn btn-ghost btn-sm" onclick="mSug('光年之外')">光年之外</button>
             <button class="btn btn-ghost btn-sm" onclick="mSug('贝加尔湖畔')">贝加尔湖畔</button>
           </div>
-          <div id="m-pl" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;align-items:center">
-            <span style="color:var(--text2);font-size:12px;line-height:24px">🎵 歌单：</span>
+          <div id="m-pl" class="mc-hot">
+            <span class="lbl">歌单：</span>
             <button class="btn btn-ghost btn-sm" onclick="mSug('经典老歌')">经典老歌</button>
             <button class="btn btn-ghost btn-sm" onclick="mSug('华语流行')">华语流行</button>
             <button class="btn btn-ghost btn-sm" onclick="mSug('民谣')">民谣</button>
             <button class="btn btn-ghost btn-sm" onclick="mSug('轻音乐')">轻音乐</button>
             <button class="btn btn-ghost btn-sm" onclick="mSug('影视原声')">影视原声</button>
-            <button class="btn btn-ghost btn-sm" onclick="mSug('游戏原声')">游戏原声</button>
-            <button class="btn btn-ghost btn-sm" onclick="mSug('儿歌')">儿歌</button>
             <button class="btn btn-ghost btn-sm" onclick="mSug('钢琴曲')">钢琴曲</button>
           </div>
-          <div id="m-results" style="margin-top:8px;display:flex;flex-direction:column;gap:6px"></div>
-          <audio id="m-audio" controls style="width:100%;margin-top:10px" preload="none"></audio>
+          <div id="m-results" class="mc-grid"></div>
+          <div class="mc-playerbar"><audio id="m-audio" controls preload="none" style="display:block"></audio></div>
         </div>
         </div>
         <div id="mt-panel-book" class="hidden">
-        <div class="ua-card">
-          <b>📚 小说 / 漫画阅读（公开内容 · 本机提取）</b>
-          <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
-            <input id="m-bq" class="input" placeholder="🔍 搜公开小说名（如：三体）" style="flex:1;min-width:260px">
-            <button class="btn btn-primary btn-sm" onclick="mBSearch()">搜公开内容</button>
+        <div class="ua-card" style="border-radius:12px">
+          <div class="mc-search" style="flex-wrap:wrap">
+            <input id="m-bq" class="input" placeholder="🔍 搜公开小说名（如：三体）" style="flex:1;min-width:240px">
+            <button class="btn btn-primary" onclick="mBSearch()">搜公开内容</button>
+            <input id="m-book-url" class="input" placeholder="或粘贴小说/文章页 URL（提取正文阅读）" style="flex:1;min-width:240px">
+            <button class="btn btn-primary" onclick="mBookLoad()">读正文</button>
           </div>
-          <div id="mb-sug" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;align-items:center">
-            <span style="color:var(--text2);font-size:12px;line-height:24px">小说热榜：</span>
+          <div id="mb-sug" class="mc-hot">
+            <span class="lbl">小说热榜：</span>
             <button class="btn btn-ghost btn-sm" onclick="mBSug('三体')">三体</button>
             <button class="btn btn-ghost btn-sm" onclick="mBSug('盗墓笔记')">盗墓笔记</button>
             <button class="btn btn-ghost btn-sm" onclick="mBSug('鬼吹灯')">鬼吹灯</button>
             <button class="btn btn-ghost btn-sm" onclick="mBSug('明朝那些事儿')">明朝那些事儿</button>
             <button class="btn btn-ghost btn-sm" onclick="mBSug('活着')">活着</button>
             <button class="btn btn-ghost btn-sm" onclick="mBSug('平凡的世界')">平凡的世界</button>
-            <button class="btn btn-ghost btn-sm" onclick="mBSug('白夜行')">白夜行</button>
           </div>
-          <div id="m-bresults" style="margin-top:6px;display:flex;flex-direction:column;gap:6px"></div>
-          <div style="display:flex;gap:6px;margin-top:8px;flex-wrap:wrap">
-            <input id="m-book-url" class="input" placeholder="或直接粘贴小说/文章页 URL（提取正文阅读）" style="flex:1;min-width:260px">
-            <button class="btn btn-primary btn-sm" onclick="mBookLoad()">读正文</button>
-          </div>
-          <div id="m-comic-sites" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;align-items:center">
-            <span style="color:var(--text2);font-size:12px;line-height:24px">🖼 漫画站（仅公开免费章节，点开浏览）：</span>
+          <div id="m-bresults" class="mc-grid"></div>
+          <div class="mc-hot" id="m-comic-sites">
+            <span class="lbl">🖼 漫画站（仅公开免费章节，点开浏览）：</span>
             <button class="btn btn-ghost btn-sm" onclick="mOpenSite('https://manhua.dmzj.com/')">动漫之家</button>
             <button class="btn btn-ghost btn-sm" onclick="mOpenSite('https://www.kuaikanmanhua.com/')">快看漫画</button>
             <button class="btn btn-ghost btn-sm" onclick="mOpenSite('https://manga.bilibili.com/')">哔哩漫画</button>
             <button class="btn btn-ghost btn-sm" onclick="mOpenSite('https://ac.qq.com/Comic/all')">腾讯动漫</button>
           </div>
-          <div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap;align-items:center">
-            <input id="m-comic-url" class="input" placeholder="或粘贴漫画/图集页 URL（提取图片翻页）" style="flex:1;min-width:260px">
-            <button class="btn btn-primary btn-sm" onclick="mComicLoad()">看图</button>
-            <span id="m-comic-nav" style="font-size:12px;color:var(--text2)"></span>
+          <div class="mc-search" style="flex-wrap:wrap">
+            <input id="m-comic-url" class="input" placeholder="或粘贴漫画/图集页 URL（提取图片翻页）" style="flex:1;min-width:240px">
+            <button class="btn btn-primary" onclick="mComicLoad()">看图</button>
+            <span id="m-comic-nav" style="font-size:12px;color:var(--text2);align-self:center"></span>
           </div>
-          <div style="display:flex;gap:6px;margin-top:8px;align-items:center">
+          <div style="display:flex;gap:6px;margin-top:10px;align-items:center">
             <b id="m-read-title" style="font-size:13px;flex:1;word-break:break-all"></b>
             <button class="btn btn-ghost btn-sm" onclick="mFont(-1)">A−</button>
             <button class="btn btn-ghost btn-sm" onclick="mFont(1)">A＋</button>
@@ -2700,22 +2720,33 @@ async function uaVSearch(){
     (window._uaVTags||[]).map(t=>'<button class="btn btn-sm btn-ghost" data-tag="'+esc(t.name)+'" onclick="uaVTag(\''+esc(t.name)+'\',this)">'+esc(t.name)+' ('+t.count+')</button>').join("");
   uaVRender();
 }
+/* ===== 媒体中心 · 主流卡片渲染助手 ===== */
+function _mcCover(ph, dur, cls){
+  const ch=((ph||"?").charCodeAt(0)||36)%360;
+  return '<div class="mc-cover" style="--c1:hsl('+ch+',46%,40%);--c2:hsl('+((ch+45)%360)+',46%,27%)">'+
+    (cls?'<span class="mc-badge">'+esc(cls)+'</span>':'')+
+    '<div class="ph">'+esc(ph)+'</div>'+
+    (dur?'<span class="mc-dur">'+esc(dur)+'</span>':'')+
+    '<span class="mc-playic">▶</span></div>';
+}
 function uaWebRender(r){
   const box=$("#ua-vresults");
   const items=r.items||[];
   $("#ua-vtags").innerHTML='';
-  let html='<span style="color:var(--text2);font-size:12px">全网网页搜索 '+items.length+' 条（点击「解析播放」尝试在线播放，仅限公开内容）</span>';
-  if(!items.length){html+='<div style="color:var(--text2);font-size:12px;margin-top:6px">未找到结果，可换关键词</div>';}
+  let html='<div style="grid-column:1/-1;color:var(--text2);font-size:12px">全网网页搜索 '+items.length+' 条 · 点击「解析播放」在线播放，仅公开内容</div>';
+  if(!items.length){html+='<div style="grid-column:1/-1;color:var(--text2);font-size:12px;margin-top:6px">未找到结果，可换关键词</div>';}
   items.forEach((it,i)=>{
-    html+='<div class="ua-card" style="padding:8px;margin-top:6px">'+
-      '<div style="font-size:13px;font-weight:600">'+esc(it.title)+'</div>'+
-      '<div style="color:var(--text2);font-size:12px;margin-top:2px">'+esc(it.domain)+((it.level===2)?'<span style="color:#4fd08a;margin-left:6px">视频平台</span>':(it.level===1?'<span style="color:var(--text2);margin-left:6px">网页</span>':''))+'</div>'+
-      '<div style="color:var(--text2);font-size:12px;margin-top:2px">'+esc(it.summary||"")+'</div>'+
-      '<div style="display:flex;gap:6px;margin-top:6px">'+
-      '<button class="btn btn-sm" style="border-color:#4fd08a;color:#4fd08a" onclick="uaWebPlay('+i+')">▶ 解析播放</button>'+
+    const d=(it.domain||"").replace(/^www\./,"")||"网页";
+    const ph=(it.title||"?").trim().slice(0,1)||"?";
+    html+='<div class="mc-card">'+
+      _mcCover(ph, "", (it.level===2?"视频平台":"网页"))+
+      '<div class="mc-body"><div class="mc-title">'+esc(it.title)+'</div>'+
+      '<div class="mc-meta"><span>'+esc(d)+'</span></div>'+
+      '<div class="mc-acts">'+
+      '<button class="btn btn-sm" style="border-color:#4fd08a;color:#4fd08a;flex:1" onclick="uaWebPlay('+i+')">▶ 解析播放</button>'+
       '<button class="btn btn-sm" style="border-color:var(--accent);color:var(--accent)" onclick="uaWebDl('+i+')">下载</button>'+
-      '<a class="btn btn-sm" style="text-decoration:none;border-color:var(--text2);color:var(--text2)" href="'+esc(it.url)+'" target="_blank" rel="noopener">打开原网页</a>'+
-      '</div></div>';
+      '<a class="btn btn-sm" style="text-decoration:none;border-color:var(--text2);color:var(--text2)" href="'+esc(it.url)+'" target="_blank" rel="noopener" title="打开原网页">↗</a>'+
+      '</div></div></div>';
   });
   box.innerHTML=html;
   window._uaWebItems=items;
@@ -2755,39 +2786,38 @@ function uaVTag(t,btn){
 function uaVRender(){
   const box=$("#ua-vresults");
   const items=(window._uaVItems||[]);
-  const srcs=window._uaVSourceInfo||"";
   const filtered = window._uaVTag ? items.filter(it=>it.tag===window._uaVTag) : items;
-  // 按分类分组
   const groups={};
   filtered.forEach(it=>{ (groups[it.tag||"其他"]=groups[it.tag||"其他"]||[]).push(it); });
   const keys=Object.keys(groups);
-  let html='<span style="color:var(--text2);font-size:12px">找到 '+filtered.length+' 条公开内容'+(window._uaVTag?('（分类：'+window._uaVTag+'）'):'')+'</span>';
-  // 「你可能也在找」推荐 chips（内置相关词，点击即搜）
+  let html='<div style="grid-column:1/-1;color:var(--text2);font-size:12px">找到 '+filtered.length+' 条公开内容'+(window._uaVTag?('（分类：'+window._uaVTag+'）'):'')+'</div>';
   const _rel=[["公开课","公开课"],["纪录片","纪录片"],["Python 教程","Python 教程"],["航拍中国","航拍中国"],["三体","三体"],["周杰伦","周杰伦"]];
   const _cur=(window._uaVLastQ||"").trim();
   const _relShow=_rel.filter(r=>!(_cur&&r[0].indexOf(_cur)>-1)).slice(0,4);
-  html+='<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;align-items:center"><span style="color:var(--text2);font-size:12px">你可能也在找：</span>'+
+  html+='<div style="grid-column:1/-1;display:flex;flex-wrap:wrap;gap:6px;align-items:center"><span style="color:var(--text2);font-size:12px">你可能也在找：</span>'+
     _relShow.map(r=>'<button class="btn btn-ghost btn-sm" data-q="'+esc(r[1])+'" onclick="uaVSug(this)">'+esc(r[1])+'</button>').join("")+'</div>';
-  if(!filtered.length){html+='<div style="color:var(--text2);font-size:12px;margin-top:6px">该分类暂无内容，可切回「全部」查看</div>';}
+  if(!filtered.length){html+='<div style="grid-column:1/-1;color:var(--text2);font-size:12px">该分类暂无内容，可切回「全部」查看</div>';}
   keys.forEach(tag=>{
     const g=groups[tag];
-    html+='<div style="margin-top:10px"><div style="font-size:12px;font-weight:700;color:var(--accent);margin-bottom:4px">▍'+esc(tag)+' · '+g.length+' 条</div>';
+    html+='<div style="grid-column:1/-1;font-size:13px;font-weight:700;color:var(--accent);margin-top:12px;display:flex;align-items:center;gap:6px">▍'+esc(tag)+'<span style="font-weight:400;color:var(--text2);font-size:11px">'+g.length+' 条</span></div>';
     g.forEach((it,i)=>{
       const gi=items.indexOf(it);
-      html+='<div class="ua-card" style="padding:8px;margin-top:6px">'+
-        '<div style="font-size:13px;font-weight:600">'+esc(it.title)+'</div>'+
-        '<div style="color:var(--text2);font-size:12px;margin-top:2px">'+esc(it.platform)+' · '+esc(it.author||"-")+' · '+esc(it.duration||"-")+'</div>'+
-        '<div style="display:flex;gap:6px;margin-top:6px">'+
-        '<button class="btn btn-sm" style="border-color:#4fd08a;color:#4fd08a" onclick="uaVPlay('+gi+')">▶ 播放</button>'+
-        '<button class="btn btn-sm" style="border-color:var(--accent);color:var(--accent)" onclick="uaVDl('+gi+')">下载</button>'+
-        (it.kind==="bangumi"?('<button class="btn btn-sm" style="border-color:#d0a64f;color:#d0a64f" onclick="uaVEps('+gi+')">选集</button>'):'')+
-        (it.kind==="video" && /(bilibili\.com|b23\.tv)/.test(it.url||"")?('<button class="btn btn-sm" style="border-color:#d0a64f;color:#d0a64f" onclick="uaVEps('+gi+')">分P</button>'):'')+
-        '</div><div id="ua-eps-'+gi+'" style="display:none;margin-top:6px"></div></div>';
+      const ph=(it.platform||"?").trim().slice(0,1)||"?";
+      const meta=(it.author?esc(it.author):"-")+(it.duration?(' · '+esc(it.duration)):'');
+      let acts='<button class="btn btn-sm" style="border-color:#4fd08a;color:#4fd08a;flex:1" onclick="uaVPlay('+gi+')">▶ 播放</button>'+
+        '<button class="btn btn-sm" style="border-color:var(--accent);color:var(--accent)" onclick="uaVDl('+gi+')">下载</button>';
+      if(it.kind==="bangumi"||(it.kind==="video" && /(bilibili\.com|b23\.tv)/.test(it.url||""))){
+        acts+='<button class="btn btn-sm" style="border-color:#d0a64f;color:#d0a64f" onclick="uaVEps('+gi+')">分集/分P</button>';
+      }
+      html+='<div class="mc-card">'+
+        _mcCover(ph, it.duration, it.platform)+
+        '<div class="mc-body"><div class="mc-title">'+esc(it.title)+'</div>'+
+        '<div class="mc-meta"><span>'+meta+'</span>'+(it.play?'<span class="pl">▶ '+esc(it.play)+'</span>':'')+'</div>'+
+        '<div class="mc-acts">'+acts+'</div>'+
+        '<div id="ua-eps-'+gi+'" style="display:none;margin-top:6px"></div></div></div>';
     });
-    html+='</div>';
   });
   box.innerHTML=html;
-  // 记录来源信息
   if(window._uaVLastR && window._uaVLastR.sources){window._uaVSourceInfo="（来源："+window._uaVLastR.sources.join(" / ")+"）";}
 }
 async function uaVEps(i){
@@ -2920,17 +2950,22 @@ async function mSearch(){
   const q=$("#m-q").value.trim();
   if(!q){toast("请输入歌名/歌手");return;}
   const box=$("#m-results");
-  box.innerHTML='<span style="color:var(--text2);font-size:12px">搜索中…</span>';
+  box.innerHTML='<div style="grid-column:1/-1;color:var(--text2);font-size:12px">搜索中…</div>';
   const r=await api("video/search",{q:q});
-  if(!r.ok){box.innerHTML='<span style="color:#e07b7b;font-size:12px">'+(r.error||"搜索失败")+'</span>';return;}
+  if(!r.ok){box.innerHTML='<div style="grid-column:1/-1;color:#e07b7b;font-size:12px">'+(r.error||"搜索失败")+'</div>';return;}
   mItems=r.items||[];
-  box.innerHTML=(mItems.length?("找到 "+mItems.length+" 条公开内容（来源："+(r.sources||[]).join("/")+"）"):"无结果")+
-    mItems.map((it,i)=>'<div class="ua-card" style="padding:8px">'+
-      '<div style="font-size:13px;font-weight:600;word-break:break-all">'+esc(it.title)+'</div>'+
-      '<div style="color:var(--text2);font-size:11px;margin-top:2px">'+esc(it.author||"-")+' · '+esc(it.duration||"-")+' · 来源：'+esc(it.platform||"-")+'</div>'+
-      '<div style="display:flex;gap:6px;margin-top:6px">'+
-      '<button class="btn btn-sm" style="border-color:#4fd08a;color:#4fd08a" onclick="mPlayEx('+i+')">▶ 播放</button>'+
-      '</div></div>').join("");
+  box.innerHTML='<div style="grid-column:1/-1;color:var(--text2);font-size:12px">找到 '+mItems.length+' 条公开内容（来源：'+(r.sources||[]).join("/")+'）</div>'+
+    mItems.map((it,i)=>{
+      const ph=(it.platform||"♪").trim().slice(0,1)||"♪";
+      const meta=(it.author?esc(it.author):"-")+(it.duration?(' · '+esc(it.duration)):'');
+      return '<div class="mc-card"><div class="mc-cover" style="aspect-ratio:1/1;--c1:hsl('+((i*57)%360)+',42%,38%);--c2:hsl('+(((i*57)+50)%360)+',42%,26%)">'+
+        '<span class="mc-badge">'+esc(it.platform||"音乐")+'</span>'+
+        '<div class="ph" style="font-size:34px">♪</div>'+
+        '<span class="mc-playic">▶</span></div>'+
+        '<div class="mc-body"><div class="mc-title">'+esc(it.title)+'</div>'+
+        '<div class="mc-meta"><span>'+meta+'</span></div>'+
+        '<div class="mc-acts"><button class="btn btn-sm" style="border-color:#4fd08a;color:#4fd08a;flex:1" onclick="mPlayEx('+i+')">▶ 播放</button></div></div></div>';
+    }).join("");
 }
 function mPlayEx(i){
   const it=(mItems||[])[i]; if(!it)return;
@@ -2975,17 +3010,18 @@ async function mBSearch(){
   const q=$("#m-bq").value.trim();
   if(!q){toast("请输入书名/关键词");return;}
   const box=$("#m-bresults");
-  box.innerHTML='<span style="color:var(--text2);font-size:12px">搜索中…</span>';
+  box.innerHTML='<div style="grid-column:1/-1;color:var(--text2);font-size:12px">搜索中…</div>';
   const r=await api("video/search",{q:q,type:"article"});
-  if(!r.ok){box.innerHTML='<span style="color:#e07b7b;font-size:12px">'+(r.error||"搜索失败")+'</span>';return;}
+  if(!r.ok){box.innerHTML='<div style="grid-column:1/-1;color:#e07b7b;font-size:12px">'+(r.error||"搜索失败")+'</div>';return;}
   const its=r.items||[];
-  box.innerHTML=(its.length?("找到 "+its.length+" 条公开内容（来源："+(r.sources||[]).join("/")+"）"):'<span style="color:var(--text2);font-size:12px">无结果</span>')+
-    its.map((it,i)=>'<div class="ua-card" style="padding:8px">'+
-      '<div style="font-size:13px;font-weight:600;word-break:break-all">'+esc(it.title)+'</div>'+
-      '<div style="color:var(--text2);font-size:11px;margin-top:2px">'+esc(it.author||"-")+' · 来源：'+esc(it.platform||"-")+'</div>'+
-      '<div style="display:flex;gap:6px;margin-top:6px">'+
-      '<button class="btn btn-sm" style="border-color:var(--accent);color:var(--accent)" onclick="mBookReadUrl('+i+')">阅读</button>'+
-      '</div></div>').join("");
+  box.innerHTML='<div style="grid-column:1/-1;color:var(--text2);font-size:12px">找到 '+its.length+' 条公开内容（来源：'+(r.sources||[]).join("/")+'）</div>'+
+    its.map((it,i)=>'<div class="mc-card"><div class="mc-cover" style="--c1:#6f4e37;--c2:#4a3226">'+
+      '<span class="mc-badge">'+esc(it.platform||"小说")+'</span>'+
+      '<div class="ph" style="font-size:34px">📖</div>'+
+      '<span class="mc-playic">▶</span></div>'+
+      '<div class="mc-body"><div class="mc-title">'+esc(it.title)+'</div>'+
+      '<div class="mc-meta"><span>'+esc(it.author||"-")+'</span></div>'+
+      '<div class="mc-acts"><button class="btn btn-sm" style="border-color:var(--accent);color:var(--accent);flex:1" onclick="mBookReadUrl('+i+')">📖 阅读</button></div></div></div>').join("");
   window._mBItems=its;
 }
 function mBookReadUrl(i){
