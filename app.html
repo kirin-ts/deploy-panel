@@ -2489,6 +2489,8 @@ async function dlRefresh(){
       +'<button class="btn btn-ghost btn-sm" onclick="dlOpenOne(\''+esc(f.path).replace(/\\/g,"\\\\").replace(/'/g,"\\'")+'\')">所在位置</button>'
       +'</div>';
   }).join("");
+  $("#dl-all").checked=false;
+  dlSelChanged();
 }
 async function dlOpenDir(){const r=await apiPost("url/dl_open",{path:''});if(!r.ok)toast(r.error);}
 async function dlOpenOne(fp){const r=await apiPost("url/dl_open",{path:fp});if(!r.ok)toast(r.error);}
@@ -2611,7 +2613,42 @@ async function uaPlayPrep(u,title){
     $("#ua-play-prog-txt").textContent="正在转码视频 "+mb.toFixed(1)+" MB"+(p.size?" / "+((p.size||0)/1048576).toFixed(1)+" MB":"")+"（完整拉流+转码中，完成后自动播放）";
   },700);
 }
+function _uaRate(r){
+  const v=$("#ua-play-video"); v.playbackRate=r;
+  document.querySelectorAll("#ua-play-ctl .btn[data-rate]").forEach(b=>{b.style.borderColor=(b.dataset.rate==String(r)?"#4fd08a":"#ffffff33");b.style.color=(b.dataset.rate==String(r)?"#4fd08a":"#fff");});
+}
+async function uaPip(){
+  const v=$("#ua-play-video");
+  try{
+    if(document.pictureInPictureElement){ await document.exitPictureInPicture(); }
+    else if(document.pictureInPictureEnabled && v.src){ await v.requestPictureInPicture(); }
+    else toast("当前浏览器不支持画中画");
+  }catch(e){ toast("画中画切换失败"); }
+}
+/* 续播记忆：同一视频下次打开自动回到上次位置（看完自动清除） */
+(function(){
+  const v=()=>document.getElementById("ua-play-video");
+  document.addEventListener("DOMContentLoaded",()=>{
+    const _v=v(); if(!_v)return;
+    _v.addEventListener("loadedmetadata",()=>{
+      const u=_v.getAttribute("data-u")||"";
+      if(!u||!_v.duration)return;
+      const t=+(localStorage.getItem("dp_pos_"+u)||0);
+      if(t>5 && t<_v.duration-10) _v.currentTime=t;
+    });
+    _v.addEventListener("timeupdate",()=>{
+      const u=_v.getAttribute("data-u")||"";
+      if(u && _v.currentTime>10) localStorage.setItem("dp_pos_"+u, Math.floor(_v.currentTime));
+    });
+    _v.addEventListener("play",()=>{
+      const c=document.getElementById("ua-play-ctl");
+      if(c) c.style.display="flex";
+    });
+  });
+})();
 function uaPlayClose(){
+  const pv0=document.getElementById("ua-play-video");
+  if(pv0 && pv0.getAttribute("data-u")) localStorage.removeItem("dp_pos_"+pv0.getAttribute("data-u"));
   try{
     const _sc=parseInt(sessionStorage.getItem("dp_scroll")||"0",10)||0;
     if(_sc>0)setTimeout(()=>{try{window.scrollTo(0,_sc);}catch(_){}},120);
@@ -2900,6 +2937,7 @@ function uaPlayEx(u,title){
   if(window._uaSecLevel==="danger"){toast("危险站点已禁止");return;}
   const mask=$("#ua-play-mask"), v=$("#ua-play-video");
   $("#ua-play-title").textContent=title||"播放中";
+  v.dataset.u=u;
   mask.classList.remove("hidden");
   $("#ua-play-prog").style.display="none";
   v.style.display=""; v.src=""; v.onerror=null; v.onplay=null;
@@ -3211,6 +3249,15 @@ function mComicNext(){if(mComicIdx<mComicImgs.length-1){mComicIdx++;mComicShow()
     <button class="btn btn-sm" onclick="uaPlayClose()" style="border-color:#fff6;color:#fff">关闭</button>
   </div>
   <video id="ua-play-video" controls autoplay style="width:min(94vw,1080px);max-height:78vh;background:#000;border-radius:8px;display:none"></video>
+  <div id="ua-play-ctl" style="width:min(94vw,1080px);display:none;align-items:center;justify-content:center;gap:8px">
+    <span style="color:#fff8;font-size:12px">倍速</span>
+    <button class="btn btn-sm" data-rate="0.75" onclick="_uaRate(0.75)">0.75x</button>
+    <button class="btn btn-sm" data-rate="1" onclick="_uaRate(1)">1x</button>
+    <button class="btn btn-sm" data-rate="1.25" onclick="_uaRate(1.25)">1.25x</button>
+    <button class="btn btn-sm" data-rate="1.5" onclick="_uaRate(1.5)">1.5x</button>
+    <button class="btn btn-sm" data-rate="2" onclick="_uaRate(2)">2x</button>
+    <button class="btn btn-sm" onclick="uaPip()" style="border-color:#4fd08a;color:#4fd08a">⧉ 画中画</button>
+  </div>
   <div id="ua-play-prog" style="width:min(94vw,1080px);display:flex;align-items:center;gap:8px">
     <div style="flex:1;height:8px;background:#ffffff1a;border-radius:4px;overflow:hidden"><div id="ua-play-prog-bar" style="height:100%;width:0%;background:#4fd08a;transition:width .3s"></div></div>
     <span id="ua-play-prog-txt" style="color:#fff;font-size:13px;min-width:60px">准备中…</span>
