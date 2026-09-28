@@ -34,3 +34,6 @@ _fix_*.py
 
 # 临时/测试脚本（防误提交）
 _[a-z_]*\.py
+
+data/filters.json
+data/.nofilter
