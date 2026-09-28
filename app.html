@@ -2594,7 +2594,7 @@ function mtTab(name,btn){
     b.style.background=on?"var(--accent11,#eaf1ff)":"";
   });
 }
-const _FG_META=[["pirate_doms","非授权/盗版影视站黑名单(域名) · 默认过滤，删除=放行，风险自担"],["black_dom","非视频站黑名单(域名)"],["black_title","黑名单标题词"],["video_doms","免费视频平台白名单(域名)"],["paid_doms","付费/会员平台黑名单(域名)"],["junk_title","非正片标题词(解说/小说等)"],["free_sites","站内搜索免费站点"]];
+const _FG_META=[["pirate_doms","非授权/盗版影视站黑名单(域名) · 默认过滤，删除=放行，风险自担"],["black_dom","非视频站黑名单(域名)"],["black_title","黑名单标题词"],["video_doms","免费视频平台白名单(域名)"],["paid_doms","付费/会员平台黑名单(域名)"],["junk_title","非正片标题词(解说/小说等)"],["free_sites","站内搜索免费站点"],["skip_login","自动排除需登录资源（解析时自动识别，遇到需登录的站不打开原网页）"]];
 let _fgData={};
 function uaOpenFilterCfg(){
   const mask=document.getElementById("ua-fg-mask");
@@ -2609,9 +2609,16 @@ function fgRender(){
   const body=document.getElementById("ua-fg-body"); if(!body) return;
   body.innerHTML="";
   for(const [key,label] of _FG_META){
-    const list=_fgData[key]||[];
     const g=document.createElement("div");
     g.style.cssText="border:1px solid var(--line,#e3e6ef);border-radius:8px;padding:10px";
+    if(key==="skip_login"){
+      const on=_fgData[key]!==false;
+      g.innerHTML="<div style='display:flex;align-items:center;justify-content:space-between;gap:10px'><div style='font-size:13px;font-weight:600'>"+esc(label)+"</div>"+
+        "<button class='btn btn-sm "+(on?"btn-primary":"btn-ghost")+"' onclick='fgToggleBool(\'"+key+"\')' style='flex:none'>"+(on?"已开启 · 自动排除":"已关闭 · 需登录站会打开原网页")+"</button></div>"+
+        "<div style='color:var(--text2);font-size:11px;margin-top:4px'>控制权在你：开启后解析到需登录/会员资源自动跳过并提示；关闭后仍会打开原网页由你决定。</div>";
+      body.appendChild(g); continue;
+    }
+    const list=_fgData[key]||[];
     g.innerHTML="<div style='font-size:13px;font-weight:600;margin-bottom:6px'>"+esc(label)+" <span style='color:var(--text2);font-weight:400;font-size:11px'>("+esc(key)+") · "+list.length+" 项</span></div>"+
       "<div class='fg-chips' style='display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px'></div>"+
       "<div style='display:flex;gap:6px'><input class='input' placeholder='输入关键词/域名，回车或点添加' style='flex:1;font-size:12px'><button class='btn btn-sm btn-primary' onclick='fgAdd(this.parentElement)'>添加</button></div>";
@@ -2628,6 +2635,12 @@ function fgRender(){
     g.querySelector("input").parentElement._fgKey = key;
     g.querySelector("input").addEventListener("keydown", function(e){ if(e.key==="Enter") fgAdd(e.target.parentElement); });
   }
+}
+function fgToggleBool(key){
+  const on=_fgData[key]!==false;
+  apiPost("media/filters",{list:key,op:"set",value:!on}).then(r=>{
+    if(r&&r.filters){ _fgData=r.filters; fgRender(); toast((!on?"已开启":"已关闭")+"自动排除需登录资源"); }
+  }).catch(e=>toast("操作失败:"+(e&&e.message||e)));
 }
 function fgDel(key,val){
   apiPost("media/filters",{list:key,op:"remove",value:val}).then(r=>{
@@ -2846,7 +2859,14 @@ function uaPlayEx(u,title){
   // 其余：先调后端解析再分流
   api("url/resolve",{url:u}).then(r=>{
     if(!r.ok){ done(); uaPlayClose(); toast(r.error||"解析失败，已打开原网页"); openSrc(); return; }
-    if(r.kind==="page"){ done(); uaPlayClose(); openSrc(); return; }
+    if(r.kind==="page"){
+      if(r.need_login && _fgData.skip_login!==false){
+        done(); uaPlayClose();
+        toast("该资源需要登录/会员才能观看，已自动跳过（可在「过滤设置」中关闭自动排除）");
+        return;
+      }
+      done(); uaPlayClose(); openSrc(); return;
+    }
     if(r.kind==="hls"){ if(!playHls(r.url)){ done(); uaPlayClose(); openSrc(); } return; }
     if(r.kind==="hls_proxy"){
       const hp="api/url/hls?u="+encodeURIComponent(r.url)+(r.ref?("&ref="+encodeURIComponent(r.ref)):"");

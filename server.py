@@ -1925,6 +1925,7 @@ _FILTER_DEFAULTS = {
     "pirate_doms": ["btbtdy.com", "btbtdy.cc", "dy2018.com", "dytt8.net", "dytt89.com",
                     "80s.tw", "80s.la", "okzyw.com", "1080zyk.com", "zxzj.pro",
                     "66s.cc", "nfmovies.com", "tvb123.com", "qq7799.com", "5dianying.com"],
+    "skip_login": True,
 }
 _FILTER_KEYS = ("black_dom", "black_title", "video_doms", "paid_doms", "junk_title", "free_sites", "pirate_doms")
 _FILTERS = dict(_FILTER_DEFAULTS)
@@ -1942,6 +1943,8 @@ def _load_filters():
                 v = d.get(k)
                 if isinstance(v, list) and all(isinstance(x, str) for x in v):
                     _FILTERS[k] = v
+            if isinstance(d.get("skip_login"), bool):
+                _FILTERS["skip_login"] = d["skip_login"]
         else:
             _FILTERS = dict(_FILTER_DEFAULTS)
             with open(_FILTER_FILE, "w", encoding="utf-8") as f:
@@ -2198,6 +2201,19 @@ def api_media_filters(body):
     lst = (body or {}).get("list")
     op = (body or {}).get("op")
     val = (body or {}).get("value")
+    if lst == "skip_login":
+        cur = bool(_FILTERS.get("skip_login", True))
+        if op == "set" and isinstance(val, bool):
+            cur = val
+        elif op == "toggle":
+            cur = not cur
+        _FILTERS["skip_login"] = cur
+        try:
+            with open(_FILTER_FILE, "w", encoding="utf-8") as f:
+                json.dump(_FILTERS, f, ensure_ascii=False, indent=2)
+        except Exception as e:
+            log("filters save error: " + repr(e))
+        return {"ok": True, "filters": dict(_FILTERS)}
     if lst in _FILTER_KEYS and op in ("add", "remove", "set"):
         cur = list(_FILTERS[lst])
         if op == "add" and isinstance(val, str) and val.strip() and val.strip() not in cur:
@@ -2220,7 +2236,7 @@ def api_media_filters(body):
         _WEB_JUNK_TITLE = tuple(_FILTERS["junk_title"])
         _WEB_FREE_SITES = tuple(_FILTERS["free_sites"])
         _WEB_PIRATE_DOMS = tuple(_FILTERS["pirate_doms"])
-    return {"ok": True, "filters": {k: _FILTERS[k] for k in _FILTER_KEYS}}
+    return {"ok": True, "filters": dict(_FILTERS)}
 
 def _bili_search(stype, q, page=1):
     """B站 wbi 公开搜索，返回 (items, ok)"""
@@ -2555,6 +2571,9 @@ def _browser_capture(u, timeout=14):
         _check_no_video = 0.0
         _check_video_id = None
         _no_video = False
+        _need_login = False
+        _check_login = 0.0
+        _check_login_id = None
         _tap_js = ("(()=>{try{"
                    "const vs=document.querySelectorAll('video');"
                    "vs.forEach(v=>{try{if(!v.src&&!v.currentSrc){v.play();}}catch(e){}});"
@@ -2566,6 +2585,9 @@ def _browser_capture(u, timeout=14):
                            "const vs=document.querySelectorAll('video').length;"
                            "const ifr=Array.from(document.querySelectorAll('iframe')).filter(f=>/play|video|player|embed/i.test(f.src||'')).length;"
                            "return {v:vs,i:ifr}})()")
+        _login_check_js = ("(()=>{const h=(location.href||'')+' '+(document.title||'');"
+                           "const vs=document.querySelectorAll('video').length;"
+                           "return {l:/login|signin|passport|verify|captcha|\\u767b\\u5f55|\\u8bf7\\u767b\\u5f55|\\u8d26\\u53f7\\u767b\\u5f55/i.test(h)&&!vs, v:vs}})()")
         while time.time() < _dead:
             try:
                 _ws.settimeout(max(0.2, _dead - time.time()))
@@ -2587,11 +2609,24 @@ def _browser_capture(u, timeout=14):
                     _send("Runtime.evaluate", {"expression": _video_check_js, "returnByValue": True})
                 except Exception:
                     pass
+            if time.time() - _check_login > 4 and not _need_login:
+                _check_login = time.time()
+                try:
+                    _check_login_id = _seq[0] + 1
+                    _send("Runtime.evaluate", {"expression": _login_check_js, "returnByValue": True})
+                except Exception:
+                    pass
             if _check_video_id is not None and _msg.get("id") == _check_video_id:
                 _check_video_id = None
                 _res = _msg.get("result", {}).get("result", {}).get("value")
                 if isinstance(_res, dict) and _res.get("v") == 0 and not _res.get("i"):
                     _no_video = True
+                    break
+            if _check_login_id is not None and _msg.get("id") == _check_login_id:
+                _check_login_id = None
+                _res = _msg.get("result", {}).get("result", {}).get("value")
+                if isinstance(_res, dict) and _res.get("l"):
+                    _need_login = True
                     break
             if _msg.get("method") == "Network.requestWillBeSent":
                 _rq = _msg.get("params", {}).get("request", {})
@@ -2604,6 +2639,8 @@ def _browser_capture(u, timeout=14):
                         break
         _ws.close()
         if not _hits:
+            if _need_login:
+                return {"need_login": True}
             return None
         _pick = None
         for _h in _hits:
@@ -2885,32 +2922,37 @@ def api_url_resolve(self, params):
         return {"ok": True, "kind": "hls", "url": u}
     if _path.endswith((".mp4", ".webm", ".flv", ".mov", ".m4s")):
         return {"ok": True, "kind": "direct", "url": u}
-    # 网页 URL：缓存优先 → 已知平台 yt-dlp → 通用网页提取
+    # 网页 URL：缓存优先 → yt-dlp（全站） → 正则兜底 → Edge headless 抓真实媒体请求
+    _need_login = False
     try:
         _ci = _play_cache_get(u)
         if _ci is None:
             _ci = None
-            # 全部网站统一走 yt-dlp（含 generic 提取器），失败降级正则兜底
             try:
                 _ci = _yt_playinfo_timed(u)
-            except Exception:
+            except Exception as _e:
+                if _need_login_hint(str(_e)):
+                    _need_login = True
                 _ci = None
             if _ci is None:
                 _ci = _web_extract_video(u)
             if _ci is not None:
                 _play_cache_put(u, info=_ci)
             else:
-                _play_cache_put(u, err="no source")
+                _play_cache_put(u, err="no source", need_login=_need_login)
         elif isinstance(_ci, dict) and _ci.get("info") is not None:
             _ci = _ci["info"]
         else:
+            _need_login = bool(_ci.get("need_login"))
             _ci = None
-        # 第三层兜底：yt-dlp 与正则都失败 → Edge headless 渲染页面抓真实媒体请求
         if not (isinstance(_ci, dict) and _ci.get("url")):
             _bc = _browser_capture(u)
             if _bc and _bc.get("url"):
                 _ci = {"url": _bc["url"], "kind": _bc.get("kind"), "ref": _bc.get("ref", ""), "title": _bc.get("title", "")}
                 _play_cache_put(u, info=_ci)
+            elif _bc and _bc.get("need_login"):
+                _need_login = True
+                _play_cache_put(u, err="no source", need_login=True)
     except Exception as e:
         return {"ok": False, "error": "解析失败：%s" % str(e)[:90]}
     if isinstance(_ci, dict) and _ci.get("url"):
@@ -2924,7 +2966,7 @@ def api_url_resolve(self, params):
         if _ci.get("aurl"):
             return {"ok": True, "kind": "dash", "url": _url, "aurl": _ci["aurl"], "title": _ci.get("title", "")}
         return {"ok": True, "kind": "direct", "url": _url, "ref": _ref, "title": _ci.get("title", "")}
-    return {"ok": True, "kind": "page", "url": u}
+    return {"ok": True, "kind": "page", "url": u, "need_login": bool(_need_login)}
 
 
 def api_url_analyze(params):
@@ -3684,6 +3726,15 @@ def _play_worker(task):
 _PLAY_CACHE = {}  # url -> {"t": time, "info": dict, "err": str}
 _PLAY_CACHE_LOCK = threading.Lock()
 
+_LOGIN_HINTS = re.compile(r"(sign\s*in|signin|log\s*in|login|authentication|authenticate|private video|members only|membership|password required|verify you are human|confirm you're not a bot|account required|requires authentication|logged in|login to|\\u767b\\u5f55|\\u8bf7\\u767b\\u5f55|\\u9700\\u8981\\u767b\\u5f55|\\u767b\\u5f55\\u540e\\u89c2\\u770b|\\u4f1a\\u5458\\u89c6\\u9891|\\u79c1\\u6709\\u89c6\\u9891)", re.I)
+
+def _need_login_hint(err):
+    """从解析错误文本识别『需登录/会员』特征，返回 True 表示该资源需登录才能播放。"""
+    try:
+        return bool(_LOGIN_HINTS.search(str(err or "")))
+    except Exception:
+        return False
+
 def _play_cache_get(u):
     with _PLAY_CACHE_LOCK:
         c = _PLAY_CACHE.get(u)
@@ -3691,9 +3742,9 @@ def _play_cache_get(u):
             return c
     return None
 
-def _play_cache_put(u, info=None, err=None):
+def _play_cache_put(u, info=None, err=None, need_login=False):
     with _PLAY_CACHE_LOCK:
-        _PLAY_CACHE[u] = {"t": time.time(), "info": info, "err": err}
+        _PLAY_CACHE[u] = {"t": time.time(), "info": info, "err": err, "need_login": bool(need_login)}
 
 def api_url_play_prep(params):
     """POST {url} → 启动临时播放准备任务（完整拉取到 data/tmp_play）"""
