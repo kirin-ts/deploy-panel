@@ -2413,29 +2413,77 @@ def api_url_playinfo(params):
 
 
 def _web_extract_video(u):
-    """通用网页视频提取：抓取页面 HTML，提取直链（mp4/webm/m3u8/flv）。
-    供 yt-dlp 不支持/未覆盖的网站兜底。返回 {"url","kind","title"} 或 None"""
-    try:
-        _wreq = urllib.request.Request(u, headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36",
-                                                   "Accept": "text/html,application/xhtml+xml,application/xml,*/*",
-                                                   "Accept-Language": "zh-CN,zh;q=0.9"})
-        with urllib.request.urlopen(_wreq, timeout=15) as _wr:
-            _html = _wr.read(2 * 1024 * 1024).decode("utf-8", "ignore")
-            _final = _wr.geturl()
-    except Exception:
+    """通用网页视频提取（yt-dlp 失败后的兜底层）：
+    1) og:video / <video>/<source> src
+    2) JSON-LD（application/ld+json）contentUrl / embedUrl
+    3) 页面内嵌 JS 全局变量里的播放地址（__INITIAL_STATE__ / __NUXT__ / videoUrl / playUrl / hls_url 等）
+    4) iframe 播放器域跟进（一层）
+    5) 媒体直链正则（mp4/m3u8/webm/flv/mov）
+    返回 {"url","kind","title"} 或 None"""
+    def _fetch(_url):
+        try:
+            _wreq = urllib.request.Request(_url, headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36",
+                                                         "Accept": "text/html,application/xhtml+xml,application/xml,*/*",
+                                                         "Accept-Language": "zh-CN,zh;q=0.9"})
+            with urllib.request.urlopen(_wreq, timeout=12) as _wr:
+                _html = _wr.read(2 * 1024 * 1024).decode("utf-8", "ignore")
+                _final = _wr.geturl()
+            return _html, _final
+        except Exception:
+            return None, _url
+    from urllib.parse import urljoin
+    _html, _final = _fetch(u)
+    if not _html:
         return None
     _mt = re.search(r"<title[^>]*>([^<]+)</title>", _html, re.I | re.S)
     _title = (_mt.group(1).strip()[:80] if _mt else "") or "视频"
     _cands = []
-    for _pat in (r'property=["\']og:video(?::(?:url|secure_url))?["\']\s+content=["\']([^"\']+)["\']',
-                 r'content=["\']([^"\']+)["\']\s+property=["\']og:video(?::(?:url|secure_url))?["\']'):
+    # 1) og:video（正反两种属性顺序）+ <video>/<source>
+    for _pat in (r"property=[\"']og:video(?::(?:url|secure_url))?[\"']\s+content=[\"']([^\"']+)[\"']",
+                 r"content=[\"']([^\"']+)[\"']\s+property=[\"']og:video(?::(?:url|secure_url))?[\"']"):
         for _m2 in re.finditer(_pat, _html, re.I):
             _cands.append(_m2.group(1))
-    for _m2 in re.finditer(r'<(?:video|source)[^>]+src=["\']([^"\']+)["\']', _html, re.I):
+    for _m2 in re.finditer(r"<(?:video|source)[^>]+src=[\"']([^\"']+)[\"']", _html, re.I):
         _cands.append(_m2.group(1))
-    for _m2 in re.finditer(r'["\'](https?://[^"\']+?\.(?:mp4|m3u8|webm|flv|mov)(?:\?[^"\']*)?)["\']', _html, re.I):
+    # 2) JSON-LD contentUrl/embedUrl
+    for _m2 in re.finditer(r"<script[^>]+type=[\"']application/ld\+json[\"'][^>]*>([\s\S]*?)</script>", _html, re.I):
+        try:
+            import json as _json
+            _ld = _json.loads(_m2.group(1))
+        except Exception:
+            continue
+        def _walk(o):
+            if isinstance(o, dict):
+                for _k in ("contentUrl", "embedUrl", "url", "video", "contentURL"):
+                    if _k in o and isinstance(o[_k], str) and o[_k].startswith(("http://", "https://")):
+                        _cands.append(o[_k])
+                if isinstance(o.get("video"), dict):
+                    _walk(o["video"])
+                for _v in o.values():
+                    _walk(_v)
+            elif isinstance(o, list):
+                for _x in o:
+                    _walk(_x)
+        _walk(_ld)
+    # 3) 页面内嵌 JS 全局变量里的播放地址
+    for _m2 in re.finditer(r"(?:videoUrl|playUrl|hls_url|hlsUrl|mp4_url|m3u8|url_high|vurl|fileUrl|video_url|playurl|data-url)[\"']?\s*[:=]\s*[\"'](https?://[^\"'\\]{5,400})[\"']", _html, re.I):
         _cands.append(_m2.group(1))
-    from urllib.parse import urljoin
+    # 4) iframe 播放器域跟进（一层）
+    for _m2 in re.finditer(r"<iframe[^>]+src=[\"']([^\"']+)[\"']", _html, re.I):
+        _fr = _m2.group(1)
+        if not _fr.startswith(("http://", "https://")):
+            _fr = urljoin(_final, _fr)
+        _fl = _fr.lower()
+        if any(_x in _fl for _x in ("play", "video", "player", "embed", ".m3u8", ".mp4", "share")):
+            _fh, _ = _fetch(_fr)
+            if _fh:
+                for _m3 in re.finditer(r"<(?:video|source)[^>]+src=[\"']([^\"']+)[\"']", _fh, re.I):
+                    _cands.append(_m3.group(1))
+                for _m3 in re.finditer(r"[\"'](https?://[^\"']+?\.(?:mp4|m3u8|webm|flv|mov)(?:\?[^\"']*)?)[\"']", _fh, re.I):
+                    _cands.append(_m3.group(1))
+    # 5) 媒体直链正则
+    for _m2 in re.finditer(r"[\"'](https?://[^\"']+?\.(?:mp4|m3u8|webm|flv|mov)(?:\?[^\"']*)?)[\"']", _html, re.I):
+        _cands.append(_m2.group(1))
     _seen = set()
     for _c in _cands:
         _c = (_c or "").strip()
@@ -2444,7 +2492,7 @@ def _web_extract_video(u):
         if not _c.startswith(("http://", "https://")):
             continue
         _low = _c.lower()
-        if any(_x in _low for _x in ("logo", "favicon", "avatar", ".css", ".js", "banner", "sprite")):
+        if any(_x in _low for _x in ("logo", "favicon", "avatar", ".css", ".js", "banner", "sprite", "thumbnail", ".jpg", ".jpeg", ".png", ".gif", "image/")):
             continue
         if _c.split("?")[0] in _seen:
             continue
@@ -2481,11 +2529,11 @@ def api_url_play(self, params):
                 _ci = _play_cache_get(u)
                 if _ci is None:
                     _ci = None
-                    if _plat:
-                        try:
-                            _ci = _yt_playinfo(u)
-                        except Exception:
-                            _ci = None
+                    # 全部网站统一走 yt-dlp（含 generic 提取器），失败降级正则兜底
+                    try:
+                        _ci = _yt_playinfo_timed(u)
+                    except Exception:
+                        _ci = None
                     if _ci is None:
                         _ci = _web_extract_video(u)
                     if _ci is not None:
@@ -2628,17 +2676,11 @@ def api_url_resolve(self, params):
         _ci = _play_cache_get(u)
         if _ci is None:
             _ci = None
-            _plat = ("bilibili.com" in _host or "douyin.com" in _host or "ixigua.com" in _host or
-                     "cctv.com" in _host or "1905.com" in _host or "163.com" in _host or
-                     "qq.com" in _host or "youku.com" in _host or "mgtv.com" in _host or
-                     "sohu.com" in _host or "acfun.cn" in _host or "huya.com" in _host or
-                     "douyu.com" in _host or "youtube.com" in _host or "vimeo.com" in _host or
-                     "archive.org" in _host)
-            if _plat:
-                try:
-                    _ci = _yt_playinfo(u)
-                except Exception:
-                    _ci = None
+            # 全部网站统一走 yt-dlp（含 generic 提取器），失败降级正则兜底
+            try:
+                _ci = _yt_playinfo_timed(u)
+            except Exception:
+                _ci = None
             if _ci is None:
                 _ci = _web_extract_video(u)
             if _ci is not None:
@@ -3026,6 +3068,25 @@ def _stream_fetch(u, ddir, timeout=30, max_mb=300, prog=None):
                 if prog:
                     prog(total, clen)
         return fp, total, ctype
+
+
+def _yt_playinfo_timed(u, timeout=25):
+    """yt-dlp 提取直链，25s 超时保护（generic 提取器对部分站点探测较慢，超时降级到正则兜底）。"""
+    import threading as _t
+    _rq = []
+    def _run():
+        try:
+            _rq.append(("ok", _yt_playinfo(u)))
+        except Exception as e:
+            _rq.append(("err", str(e)))
+    _th = _t.Thread(target=_run, daemon=True)
+    _th.start()
+    _th.join(timeout)
+    if not _rq:
+        raise RuntimeError("yt-dlp 解析超时（>%ds）" % timeout)
+    if _rq[0][0] == "ok":
+        return _rq[0][1]
+    raise RuntimeError(_rq[0][1])
 
 
 def _yt_playinfo(u):
