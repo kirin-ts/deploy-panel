@@ -2412,6 +2412,48 @@ def api_url_playinfo(params):
         return {"ok": False, "error": str(e)[:200]}
 
 
+def _web_extract_video(u):
+    """通用网页视频提取：抓取页面 HTML，提取直链（mp4/webm/m3u8/flv）。
+    供 yt-dlp 不支持/未覆盖的网站兜底。返回 {"url","kind","title"} 或 None"""
+    try:
+        _wreq = urllib.request.Request(u, headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36",
+                                                   "Accept": "text/html,application/xhtml+xml,application/xml,*/*",
+                                                   "Accept-Language": "zh-CN,zh;q=0.9"})
+        with urllib.request.urlopen(_wreq, timeout=15) as _wr:
+            _html = _wr.read(2 * 1024 * 1024).decode("utf-8", "ignore")
+            _final = _wr.geturl()
+    except Exception:
+        return None
+    _mt = re.search(r"<title[^>]*>([^<]+)</title>", _html, re.I | re.S)
+    _title = (_mt.group(1).strip()[:80] if _mt else "") or "视频"
+    _cands = []
+    for _pat in (r'property=["\']og:video(?::(?:url|secure_url))?["\']\s+content=["\']([^"\']+)["\']',
+                 r'content=["\']([^"\']+)["\']\s+property=["\']og:video(?::(?:url|secure_url))?["\']'):
+        for _m2 in re.finditer(_pat, _html, re.I):
+            _cands.append(_m2.group(1))
+    for _m2 in re.finditer(r'<(?:video|source)[^>]+src=["\']([^"\']+)["\']', _html, re.I):
+        _cands.append(_m2.group(1))
+    for _m2 in re.finditer(r'["\'](https?://[^"\']+?\.(?:mp4|m3u8|webm|flv|mov)(?:\?[^"\']*)?)["\']', _html, re.I):
+        _cands.append(_m2.group(1))
+    from urllib.parse import urljoin
+    _seen = set()
+    for _c in _cands:
+        _c = (_c or "").strip()
+        if not _c.startswith(("http://", "https://")):
+            _c = urljoin(_final, _c)
+        if not _c.startswith(("http://", "https://")):
+            continue
+        _low = _c.lower()
+        if any(_x in _low for _x in ("logo", "favicon", "avatar", ".css", ".js", "banner", "sprite")):
+            continue
+        if _c.split("?")[0] in _seen:
+            continue
+        _seen.add(_c.split("?")[0])
+        _kind = "m3u8" if (".m3u8" in _low or ".m3u" in _low) else "direct"
+        return {"url": _c, "kind": _kind, "title": _title}
+    return None
+
+
 def api_url_play(self, params):
     """GET /api/url/play?url=<直链>&a=<音频流>&ref=<来源页>
     分离流用 ffmpeg 实时合并成 fMP4 流式转发；单流直接代理（支持 Range）。"""
@@ -2433,19 +2475,32 @@ def api_url_play(self, params):
                  "douyu.com" in _host or "youtube.com" in _host or "vimeo.com" in _host or
                  "archive.org" in _host)
         _is_direct = _path.endswith((".mp4", ".m4s", ".webm", ".flv", ".mov", ".m3u8")) or _host.startswith(("upos", "aliyun", "vdse", "v.kuaishou", "txmov2"))
-        if _plat and not _is_direct:
+        if not _is_direct:
+            # 网页 URL：已知平台优先 yt-dlp；全部平台失败后用通用网页提取（video/og:video/直链正则）
             try:
                 _ci = _play_cache_get(u)
                 if _ci is None:
-                    _ci = _yt_playinfo(u)
-                    _play_cache_put(u, info=_ci)
+                    _ci = None
+                    if _plat:
+                        try:
+                            _ci = _yt_playinfo(u)
+                        except Exception:
+                            _ci = None
+                    if _ci is None:
+                        _ci = _web_extract_video(u)
+                    if _ci is not None:
+                        _play_cache_put(u, info=_ci)
+                    else:
+                        _play_cache_put(u, err="no source")
                 elif isinstance(_ci, dict) and _ci.get("info") is not None:
                     _ci = _ci["info"]  # 缓存返回整条目，取 info 部分
+                else:
+                    _ci = None  # err 缓存命中
             except Exception as _e:
                 self._send(502, json.dumps({"ok": False, "error": "源站解析失败：%s（可能需登录或平台风控，请稍后重试）" % str(_e)[:90]}).encode("utf-8"), "application/json; charset=utf-8")
                 return
             if not (isinstance(_ci, dict) and _ci.get("url")):
-                self._send(502, json.dumps({"ok": False, "error": "未解析到可播放直链（可能需登录或会员）"}).encode("utf-8"), "application/json; charset=utf-8")
+                self._send(502, json.dumps({"ok": False, "error": "未找到可播放视频源（将自动打开原网页观看）"}).encode("utf-8"), "application/json; charset=utf-8")
                 return
             if not a and _ci.get("aurl"):
                 a = _ci["aurl"]
@@ -2504,6 +2559,12 @@ def api_url_play(self, params):
                 return
             except Exception:
                 pass
+    # HLS(m3u8)：由前端 hls.js 直接拉流（真正边下边看、支持多码率）。
+    # 后端不再 ffmpeg 转流（mp4 muxer 对 pipe 输出有缓冲，小数据流不出首字节），
+    # 若被旧前端误调用直接 502，前端会回退打开原网页。
+    if u.lower().split("?")[0].endswith((".m3u8", ".m3u")):
+        self._send(502, json.dumps({"ok": False, "error": "HLS 流请使用新版播放器（hls.js 直连）"}).encode("utf-8"), "application/json; charset=utf-8")
+        return
     rng = self.headers.get("Range")
     try:
         req = urllib.request.Request(u, headers=hd)
@@ -2546,6 +2607,58 @@ def api_url_play(self, params):
             self.wfile.write(str(e)[:120].encode("utf-8", "replace"))
         except Exception:
             pass
+
+
+def api_url_resolve(self, params):
+    """GET /api/url/resolve?url= → 解析视频来源并分类，供前端分流播放：
+    kind=hls（m3u8，前端 hls.js 直连）/ dash（分离流，后端 ffmpeg 合并）/
+    direct（单流，后端流式代理）/ page（无直链，前端打开原网页）"""
+    u = str(params.get("url") or "").strip()
+    if not u.startswith(("http://", "https://")):
+        return {"ok": False, "error": "请提供 http(s):// 链接"}
+    from urllib.parse import urlparse as _up
+    _pp = _up(u); _host = (_pp.hostname or "").lower(); _path = (_pp.path or "").lower()
+    # 直链直接分类
+    if _path.endswith((".m3u8", ".m3u")):
+        return {"ok": True, "kind": "hls", "url": u}
+    if _path.endswith((".mp4", ".webm", ".flv", ".mov", ".m4s")):
+        return {"ok": True, "kind": "direct", "url": u}
+    # 网页 URL：缓存优先 → 已知平台 yt-dlp → 通用网页提取
+    try:
+        _ci = _play_cache_get(u)
+        if _ci is None:
+            _ci = None
+            _plat = ("bilibili.com" in _host or "douyin.com" in _host or "ixigua.com" in _host or
+                     "cctv.com" in _host or "1905.com" in _host or "163.com" in _host or
+                     "qq.com" in _host or "youku.com" in _host or "mgtv.com" in _host or
+                     "sohu.com" in _host or "acfun.cn" in _host or "huya.com" in _host or
+                     "douyu.com" in _host or "youtube.com" in _host or "vimeo.com" in _host or
+                     "archive.org" in _host)
+            if _plat:
+                try:
+                    _ci = _yt_playinfo(u)
+                except Exception:
+                    _ci = None
+            if _ci is None:
+                _ci = _web_extract_video(u)
+            if _ci is not None:
+                _play_cache_put(u, info=_ci)
+            else:
+                _play_cache_put(u, err="no source")
+        elif isinstance(_ci, dict) and _ci.get("info") is not None:
+            _ci = _ci["info"]
+        else:
+            _ci = None
+    except Exception as e:
+        return {"ok": False, "error": "解析失败：%s" % str(e)[:90]}
+    if isinstance(_ci, dict) and _ci.get("url"):
+        _url = _ci["url"]; _low = _url.lower()
+        if ".m3u8" in _low or ".m3u" in _low:
+            return {"ok": True, "kind": "hls", "url": _url, "title": _ci.get("title", "")}
+        if _ci.get("aurl"):
+            return {"ok": True, "kind": "dash", "url": _url, "aurl": _ci["aurl"], "title": _ci.get("title", "")}
+        return {"ok": True, "kind": "direct", "url": _url, "title": _ci.get("title", "")}
+    return {"ok": True, "kind": "page", "url": u}
 
 
 def api_url_analyze(params):
@@ -3764,6 +3877,9 @@ class Handler(BaseHTTPRequestHandler):
             if parsed.path == "/" or parsed.path == "/index.html" or parsed.path == "/app.html":
                 with open(os.path.join(BASE, "app.html"), "rb") as f:
                     return self._send(200, f.read(), "text/html; charset=utf-8")
+            if parsed.path == "/hls.min.js":
+                with open(os.path.join(BASE, "hls.min.js"), "rb") as f:
+                    return self._send(200, f.read(), "application/javascript; charset=utf-8")
             if parsed.path == "/api/video/search":
                 return self._send(200, json.dumps(api_video_search(params), ensure_ascii=False).encode("utf-8"))
             if parsed.path == "/api/url/dl_tasks":
@@ -3778,6 +3894,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(200, json.dumps(api_url_playinfo(params), ensure_ascii=False).encode("utf-8"))
             if parsed.path == "/api/url/play":
                 api_url_play(self, params)
+            if parsed.path == "/api/url/resolve":
+                return self._send(200, json.dumps(api_url_resolve(self, params), ensure_ascii=False).encode("utf-8"))
             if parsed.path == "/api/url/analyze":
                 return self._send(200, json.dumps(api_url_analyze(params), ensure_ascii=False).encode("utf-8"))
             if parsed.path == "/api/url/check":

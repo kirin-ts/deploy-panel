@@ -821,6 +821,7 @@ input:focus,textarea:focus{outline:none;border-color:var(--accent)}
   </div>
 </div>
 
+<script src="hls.min.js"></script>
 <script>
 "use strict";
 const $ = (s) => document.querySelector(s);
@@ -2566,6 +2567,7 @@ async function uaPlayPrep(u,title){
 }
 function uaPlayClose(){
   const pv=$("#ua-play-video"); _uaStream=null; pv.onerror=null;
+  if(window._uaHls){ try{ window._uaHls.destroy(); }catch(_){} window._uaHls=null; }
   pv.pause(); pv.removeAttribute("src"); pv.load();
   pv.style.display="none";
   $("#ua-play-prog").style.display="none";
@@ -2823,22 +2825,47 @@ function uaPlayEx(u,title){
   mask.classList.remove("hidden");
   $("#ua-play-prog").style.display="none";
   v.style.display=""; v.src=""; v.onerror=null; v.onplay=null;
-  // 流式代理（后端自动解析直链，缓存优先）：同步设 src + play() 保留用户手势 → 点开即播
-  v.src="api/url/play?url="+encodeURIComponent(u);
-  v.play().catch(()=>{});
   const done=()=>{ if(_uaStream===v){_uaStream=null; v.onerror=null;} };
-  _uaStream=v;
-  v.onplay=done;
-  v.onerror=()=>{ done(); uaPlayClose(); toast("流式播放失败，改用完整下载模式…"); uaPlayPrep(u,title); };
-  // 12s 内无数据（解析失败/需登录/源不可达）→ 抖音类提示打开原网页，其余回退完整下载
-  setTimeout(()=>{
-    if(_uaStream!==v) return;
-    if(v.readyState<2){
-      done(); uaPlayClose();
-      if(/douyin|kuaishou/i.test(u)){ toast("该平台需登录或浏览器 cookies，无法直接播放，已打开原网页观看"); window.open(u,"_blank"); }
-      else { toast("流式加载超时，改用完整下载模式…"); uaPlayPrep(u,title); }
+  const openSrc=()=>{ toast("该网站未开放直连播放，已打开原网页观看"); window.open(u,"_blank"); };
+  const playHls=(m3u8)=>{
+    if(window.Hls && Hls.isSupported()){
+      const hls=new Hls({maxBufferLength:60, backBufferLength:30, enableWorker:true, lowLatencyMode:false});
+      window._uaHls=hls;
+      hls.on(Hls.Events.MANIFEST_PARSED,()=>v.play().catch(()=>{}));
+      hls.on(Hls.Events.ERROR,(ev,data)=>{ if(data&&data.fatal){ try{hls.destroy();}catch(_){} window._uaHls=null; done(); uaPlayClose(); openSrc(); } });
+      hls.loadSource(m3u8); hls.attachMedia(v);
+      return true;
     }
-  },12000);
+    return false;
+  };
+  _uaStream=v; v.onplay=done;
+  const isM3u8=/\.m3u8(\?|$)/i.test(u);
+  const isDirect=/\.(mp4|m3u8|webm|flv|mov)(\?|$)/i.test(u);
+  // m3u8 直链：hls.js 直连（真正边下边看）；无 hls.js 则打开原网页（下载 m3u8 清单无意义）
+  if(isM3u8){ if(!playHls(u)) openSrc(); return; }
+  // 其余：先调后端解析再分流
+  api("url/resolve",{url:u}).then(r=>{
+    if(!r.ok){ done(); uaPlayClose(); toast(r.error||"解析失败，已打开原网页"); openSrc(); return; }
+    if(r.kind==="page"){ done(); uaPlayClose(); openSrc(); return; }
+    if(r.kind==="hls"){ if(!playHls(r.url)){ done(); uaPlayClose(); openSrc(); } return; }
+    // direct / dash：后端流式代理（单流直接代理 / 分离流 ffmpeg 合并）
+    const q="url="+encodeURIComponent(r.url||u)+(r.aurl?("&a="+encodeURIComponent(r.aurl)):"");
+    v.src="api/url/play?"+q;
+    v.play().catch(()=>{});
+    setTimeout(()=>{
+      if(_uaStream!==v) return;
+      if(v.readyState<2){
+        done(); uaPlayClose();
+        if(isDirect){ toast("流式加载超时，改用完整下载模式…"); uaPlayPrep(u,title); }
+        else { openSrc(); }
+      }
+    },12000);
+  }).catch(()=>{ done(); uaPlayClose(); openSrc(); });
+  v.onerror=()=>{
+    done(); uaPlayClose();
+    if(isDirect){ toast("流式播放失败，改用完整下载模式…"); uaPlayPrep(u,title); }
+    else { openSrc(); }
+  };
 }
 function uaVPlay(i){
   const it=(window._uaVItems||[])[i]; if(!it)return;
