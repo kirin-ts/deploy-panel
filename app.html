@@ -549,11 +549,22 @@ input:focus,textarea:focus{outline:none;border-color:var(--accent)}
             <input id="m-q" class="input" placeholder="搜音乐：歌名 / 歌手，如：周杰伦 晴天" onkeydown="if(event.key==='Enter')mSearch()">
             <button class="btn btn-primary" onclick="mSearch()">🔍 搜索</button>
           </div>
-          <div class="mc-navchips">
+          <div class="mc-navchips" style="flex-wrap:wrap">
             <span class="lbl">频道：</span>
-            <button class="btn btn-ghost btn-sm" onclick="mNav('recommend')">🎧 推荐</button>
-            <button class="btn btn-ghost btn-sm" onclick="mNav('rank')">🔥 排行</button>
             <button class="btn btn-ghost btn-sm" onclick="mNav('playlist')">📋 歌单</button>
+            <button class="btn btn-ghost btn-sm" onclick="mSug('新歌 2026')">✨ 新歌</button>
+            <button class="btn btn-ghost btn-sm" onclick="mSug('热歌榜')">🔥 热歌</button>
+            <button class="btn btn-ghost btn-sm" onclick="mSug('经典老歌')">📀 经典</button>
+            <button class="btn btn-ghost btn-sm" onclick="mSug('纯音乐')">🎐 纯音乐</button>
+            <button class="btn btn-ghost btn-sm" onclick="mSug('古风')">🏮 古风</button>
+            <button class="btn btn-ghost btn-sm" onclick="mSug('影视OST')">🎬 影视OST</button>
+            <button class="btn btn-ghost btn-sm" onclick="mSug('爵士')">🥃 爵士</button>
+            <button class="btn btn-ghost btn-sm" onclick="mSug('摇滚')">🎸 摇滚</button>
+            <button class="btn btn-ghost btn-sm" onclick="mSug('电音')">⚡ 电音</button>
+            <button class="btn btn-ghost btn-sm" onclick="mSug('粤语歌')">🇭🇰 粤语</button>
+            <button class="btn btn-ghost btn-sm" onclick="mSug('英文歌')">🇬🇧 英文</button>
+            <button class="btn btn-ghost btn-sm" onclick="mSug('儿歌')">🧸 儿歌</button>
+            <button class="btn btn-ghost btn-sm" onclick="mSug('现场Live')">🎤 Live</button>
           </div>
           <div class="mc-sec" id="mc-sec-playlist"><span class="ico" style="background:#ff5f6d">♫</span> 歌单广场</div>
           <div id="m-pl" class="mc-grid"></div>
@@ -565,6 +576,13 @@ input:focus,textarea:focus{outline:none;border-color:var(--accent)}
             <button class="btn btn-ghost btn-sm" onclick="mSug('孤勇者')">孤勇者</button>
             <button class="btn btn-ghost btn-sm" onclick="mSug('平凡之路')">平凡之路</button>
             <button class="btn btn-ghost btn-sm" onclick="mSug('贝加尔湖畔')">贝加尔湖畔</button>
+            <button class="btn btn-ghost btn-sm" onclick="mSug('海阔天空')">海阔天空</button>
+            <button class="btn btn-ghost btn-sm" onclick="mSug('晴天 周杰伦')">晴天</button>
+            <button class="btn btn-ghost btn-sm" onclick="mSug('七里香')">七里香</button>
+            <button class="btn btn-ghost btn-sm" onclick="mSug('如愿')">如愿</button>
+            <button class="btn btn-ghost btn-sm" onclick="mSug('夜曲')">夜曲</button>
+            <button class="btn btn-ghost btn-sm" onclick="mSug('兰亭序')">兰亭序</button>
+            <button class="btn btn-ghost btn-sm" onclick="mSug('漠河舞厅')">漠河舞厅</button>
           </div>
           <div class="mc-sec" id="mc-sec-result"><span class="ico" style="background:#4fd08a">♬</span> 搜索结果</div>
           <div id="m-results" class="mc-grid"></div>
@@ -3029,7 +3047,7 @@ function uaDlStartWith(u){
 /* ===== 媒体中心 · 音乐 ===== */
 let mTmp=null, mItems=[];
 /* 酷狗风 · 歌单广场卡 */
-const _M_PL=[["经典老歌","#ff5f6d","#ffc371"],["华语流行","#3a7bd5","#00d2ff"],["民谣","#11998e","#38ef7d"],["轻音乐","#7c4dff","#00dbde"],["影视原声","#fc4a1a","#f7b733"],["钢琴曲","#654ea3","#eaafc8"]];
+const _M_PL=[["经典老歌","#ff5f6d","#ffc371"],["华语流行","#3a7bd5","#00d2ff"],["民谣","#11998e","#38ef7d"],["轻音乐","#7c4dff","#00dbde"],["影视原声","#fc4a1a","#f7b733"],["钢琴曲","#654ea3","#eaafc8"],["粤语经典","#c0392b","#f1c40f"],["英文金曲","#2c3e50","#3498db"],["摇滚现场","#8e44ad","#ff5f6d"],["爵士蓝调","#34495e","#e67e22"],["古典乐","#b7950b","#f5f5dc"],["电音舞曲","#00c6ff","#0072ff"],["古风国乐","#bf5b3f","#8bc34a"],["儿歌童谣","#ff9ff3","#54a0ff"]];
 function mRenderPl(){
   const box=$("#m-pl"); if(!box)return;
   if(box.children.length)return;
