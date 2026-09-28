@@ -886,6 +886,7 @@ function stars(n){return n>=1000?(n/1000).toFixed(1)+"k":n;}
 
 /* 视图切换 */
 function show(view){
+  try{localStorage.setItem("dp_view",view);}catch(_){}
   $$(".nav-item").forEach(i=>i.classList.toggle("active",i.dataset.view===view));
   ["search","audit","deploy","pack","settings","flow","media","downloads","app"].forEach(v=>$("#view-"+v).classList.toggle("hidden",v!==view));
   const titles={search:"项目搜索",audit:"合规审核中心",deploy:"我的部署",pack:"环境打包",settings:"设置",flow:"网址分析",media:"媒体中心",downloads:"下载资源",app:"应用搭建器"};
@@ -968,7 +969,6 @@ async function openRepo(full){
   
 
 
-  show("search");
   const box=document.createElement("div");
   box.id="repo-detail";
   const old=document.getElementById("repo-detail");if(old)old.remove();
@@ -2562,7 +2562,6 @@ setTimeout(uaLoadFiles,600);
 
 /* 积木工作室已下线：loadBlocks(); */
 
-show("search");
 
 async function uaPlay(){
   const v=$("#ua-vurl").value.trim();
@@ -2571,6 +2570,7 @@ async function uaPlay(){
   uaPlayPrep(v,"");
 }
 async function uaPlayPrep(u,title){
+  try{sessionStorage.setItem("dp_scroll",String(window.scrollY||0));}catch(_){}
   $("#ua-play-title").textContent=title||"准备播放…";
   $("#ua-play-video").style.display="none";
   $("#ua-play-prog").style.display="flex";
@@ -2606,6 +2606,10 @@ async function uaPlayPrep(u,title){
   },700);
 }
 function uaPlayClose(){
+  try{
+    const _sc=parseInt(sessionStorage.getItem("dp_scroll")||"0",10)||0;
+    if(_sc>0)setTimeout(()=>{try{window.scrollTo(0,_sc);}catch(_){}},120);
+  }catch(_){}
   const pv=$("#ua-play-video"); _uaStream=null; pv.onerror=null;
   if(window._uaHls){ try{ window._uaHls.destroy(); }catch(_){} window._uaHls=null; }
   pv.pause(); pv.removeAttribute("src"); pv.load();
@@ -2623,6 +2627,7 @@ function uaPlayClose(){
 window._uaVSource="all";
 window._uaVTag="";
 function mtTab(name,btn){
+  try{localStorage.setItem("dp_mtab",name);}catch(_){}
   ["video","music","book"].forEach(n=>{
     const p=$("#mt-panel-"+n);
     if(p)p.classList.toggle("hidden",n!==name);
@@ -3147,6 +3152,23 @@ function mComicShow(){
 function mComicErr(img){img.outerHTML='<span style="color:#e07b7b;font-size:12px">图片加载失败（可能防盗链）</span>';}
 function mComicPrev(){if(mComicIdx>0){mComicIdx--;mComicShow();}}
 function mComicNext(){if(mComicIdx<mComicImgs.length-1){mComicIdx++;mComicShow();}}
+
+/* 播放/跳转后返回：恢复上次所在视图与媒体中心内部页签（脚本末尾执行，避免 const TDZ） */
+(function(){
+  let _v="search";
+  try{_v=localStorage.getItem("dp_view")||"search";}catch(_){}
+  show(_v);
+  if(_v==="media"){
+    let _mt="video";
+    try{_mt=localStorage.getItem("dp_mtab")||"video";}catch(_){}
+    mtTab(_mt);
+  }
+  let _sc=0;
+  try{_sc=parseInt(sessionStorage.getItem("dp_scroll")||"0",10)||0;}catch(_){}
+  if(_sc>0){
+    [400,1000,2000].forEach(d=>setTimeout(()=>{try{window.scrollTo(0,_sc);}catch(_){}},d));
+  }
+})();
 
 </script>
 <!-- 直接播放弹层 -->
