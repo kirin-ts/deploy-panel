@@ -3036,21 +3036,27 @@ function mPlayEx(i){
   const a=$("#m-audio"); a.pause(); a.src=""; a.onerror=null;
   const now=$("#m-now"); if(now)now.textContent="♪ 正在播放："+it.title+" · "+it.author;
   if(mTmp){api("url/play_clean",{path:mTmp}).then(()=>{});mTmp=null;}
-  toast("点开即播…（先取直链，失败自动降级）");
-  // 优先直链直连（最快）：先 playinfo（带缓存），命中音频直链则浏览器直连
+  // 先取解析信息（带缓存）：纯音频直链 -> 浏览器直连；视频流(mp4/含Referer防盗链的CDN) -> 服务端流式代理
   api("url/playinfo",{url:it.url}).then(info=>{
     if(info && info.ok && info.url){
       const low=(""+info.url).toLowerCase();
-      const audioExt=/\.(mp3|m4a|aac|oga|ogg|flac|wav|opus|mp4)(\?|$)/.test(low);
+      const pureAudio=/\.(mp3|m4a|aac|oga|ogg|flac|wav|opus)(\?|$)/.test(low);
       const kind=(info.kind||"")+" "+(info.ext||"");
-      if(audioExt || kind.indexOf("audio")>=0 || kind.indexOf("direct")>=0){
-        a.onerror=null; a.src=info.url; a.play().catch(()=>{});
+      if(pureAudio || kind.indexOf("audio")>=0){
+        // 纯音频直连（最快），失败即时降级流式
+        a.onerror=()=>{ a.onerror=null; a.src=""; toast("直连失败，改用流式代理…"); mPlayStream(it); };
+        a.src=info.url; a.play().catch(()=>{});
         setTimeout(()=>{ if(!a.paused || a.readyState>=2) return; a.onerror=null; a.src=""; toast("直连超时，改用流式代理…"); mPlayStream(it); },8000);
         return;
       }
+      // mp4 等视频流直链（如B站MV CDN 防盗链严格）：走服务端转发，自带 Referer/UA，稳定可播
+      toast("正在缓冲…（流式代理）");
+      mPlayStream(it);
+      return;
     }
+    toast("正在缓冲…（流式代理）");
     mPlayStream(it);
-  }).catch(()=>mPlayStream(it));
+  }).catch(()=>{ toast("正在缓冲…（流式代理）"); mPlayStream(it); });
 }
 function mPlayStream(it){
   const a=$("#m-audio");
