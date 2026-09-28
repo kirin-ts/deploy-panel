@@ -2766,7 +2766,7 @@ function uaVRender(){
         '<button class="btn btn-sm" style="border-color:#4fd08a;color:#4fd08a" onclick="uaVPlay('+gi+')">▶ 播放</button>'+
         '<button class="btn btn-sm" style="border-color:var(--accent);color:var(--accent)" onclick="uaVDl('+gi+')">下载</button>'+
         (it.kind==="bangumi"?('<button class="btn btn-sm" style="border-color:#d0a64f;color:#d0a64f" onclick="uaVEps('+gi+')">选集</button>'):'')+
-        (it.kind==="video"?('<button class="btn btn-sm" style="border-color:#d0a64f;color:#d0a64f" onclick="uaVEps('+gi+')">分P</button>'):'')+
+        (it.kind==="video" && /(bilibili\.com|b23\.tv)/.test(it.url||"")?('<button class="btn btn-sm" style="border-color:#d0a64f;color:#d0a64f" onclick="uaVEps('+gi+')">分P</button>'):'')+
         '</div><div id="ua-eps-'+gi+'" style="display:none;margin-top:6px"></div></div>';
     });
     html+='</div>';
@@ -2782,6 +2782,7 @@ async function uaVEps(i){
   box.style.display="block";
   box.innerHTML='<span style="color:var(--text2);font-size:12px">加载分集…</span>';
   let r;
+  if(!/bilibili\.com|b23\.tv/.test(it.url||"") && it.kind!=="bangumi"){box.innerHTML='<span style="color:#e07b7b;font-size:12px">该平台不支持分P，可直接播放</span>';return;}
   if(it.kind==="bangumi"){
     const sid=(it.url||"").match(/bangumi\/play\/ss(\d+)/);
     r=await apiPost("media/episodes",{kind:"bangumi",season_id:sid?sid[1]:""});
