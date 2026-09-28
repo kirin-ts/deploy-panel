@@ -1841,6 +1841,8 @@ def api_media_article(params):
     u = str(params.get("url") or "").strip()
     if not u.startswith(("http://", "https://")):
         return {"ok": False, "error": "请提供 http(s):// 链接"}
+    if not _url_external_ok(u):
+        return {"ok": False, "error": "仅允许解析公网链接（已拦截内网/本机地址）"}
     try:
         html = _fetch_page(u)
         m = re.search(r"<title[^>]*>([^<]+)</title>", html, re.I | re.S)
@@ -2755,7 +2757,8 @@ def api_url_hlsseg(self, params):
     _ct = _resp.headers.get("Content-Type") or "application/octet-stream"
     self.send_response(200)
     self.send_header("Content-Type", _ct)
-    self.send_header("Access-Control-Allow-Origin", "*")
+    for _k, _v in _cors_allow(self).items():
+        self.send_header(_k, _v)
     self.send_header("Cache-Control", "public, max-age=3600")
     self.end_headers()
     while True:
@@ -2857,7 +2860,8 @@ def api_url_play(self, params):
                 self.send_response(200)
                 self.send_header("Content-Type", "video/mp4")
                 self.send_header("Accept-Ranges", "none")
-                self.send_header("Access-Control-Allow-Origin", "*")
+                for _k, _v in _cors_allow(self).items():
+                    self.send_header(_k, _v)
                 self.end_headers()
                 while True:
                     try:
@@ -2904,7 +2908,8 @@ def api_url_play(self, params):
                 v = resp.headers.get(k)
                 if v:
                     self.send_header(k, v)
-            self.send_header("Access-Control-Allow-Origin", "*")
+            for _k, _v in _cors_allow(self).items():
+                self.send_header(_k, _v)
             self.end_headers()
             while True:
                 blk = resp.read(64 * 1024)
@@ -2924,6 +2929,35 @@ def api_url_play(self, params):
             pass
 
 
+def _url_external_ok(u):
+    """仅允许公网 http(s) 链接：拦截本机/内网/云元数据地址（SSRF 防护）"""
+    try:
+        _h = (urllib.parse.urlparse(u).hostname or "").lower().rstrip(".")
+    except Exception:
+        return False
+    if not _h or _h in ("localhost", "127.0.0.1", "::1", "[::1]", "0.0.0.0"):
+        return False
+    if _h.startswith("169.254."):
+        return False
+    if re.match(r"^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)", _h):
+        return False
+    if _h.endswith((".local", ".lan", ".internal")):
+        return False
+    return True
+
+def _cors_allow(self):
+    """仅回显本机 Origin（127.0.0.1/localhost），跨站不发 CORS 头"""
+    _o = self.headers.get("Origin") or ""
+    if not _o:
+        return {}
+    try:
+        _h = (urllib.parse.urlparse(_o).hostname or "").lower().rstrip(".")
+    except Exception:
+        _h = ""
+    if _h in ("127.0.0.1", "localhost", "::1"):
+        return {"Access-Control-Allow-Origin": _o}
+    return {}
+
 def api_url_resolve(self, params):
     """GET /api/url/resolve?url= → 解析视频来源并分类，供前端分流播放：
     kind=hls（m3u8，前端 hls.js 直连）/ dash（分离流，后端 ffmpeg 合并）/
@@ -2931,6 +2965,8 @@ def api_url_resolve(self, params):
     u = str(params.get("url") or "").strip()
     if not u.startswith(("http://", "https://")):
         return {"ok": False, "error": "请提供 http(s):// 链接"}
+    if not _url_external_ok(u):
+        return {"ok": False, "error": "仅允许解析公网链接（已拦截内网/本机地址）"}
     from urllib.parse import urlparse as _up
     _pp = _up(u); _host = (_pp.hostname or "").lower(); _path = (_pp.path or "").lower()
     # 直链直接分类
@@ -3285,9 +3321,9 @@ def api_url_download(params):
     urls = params.get("urls") or []
     if isinstance(urls, str):
         urls = [urls]
-    urls = [str(u).strip() for u in urls if str(u).strip().startswith(("http://", "https://"))][:20]
+    urls = [str(u).strip() for u in urls if str(u).strip().startswith(("http://", "https://")) and _url_external_ok(u)][:20]
     if not urls:
-        return {"ok": False, "error": "请提供 http(s):// 的资源地址"}
+        return {"ok": False, "error": "请提供公网 http(s):// 的资源地址（已拦截内网/本机）"}
     ddir = os.path.join(WORKSPACES, "downloads")
     try:
         os.makedirs(ddir, exist_ok=True)
@@ -3553,9 +3589,9 @@ def api_url_dl_video(params):
     urls = params.get("urls") or []
     if isinstance(urls, str):
         urls = [urls]
-    urls = [_clean_dup_url(str(u).strip()) for u in urls if str(u).strip().startswith(("http://", "https://"))][:5]
+    urls = [_clean_dup_url(str(u).strip()) for u in urls if str(u).strip().startswith(("http://", "https://")) and _url_external_ok(u)][:5]
     if not urls:
-        return {"ok": False, "error": "请提供 http(s):// 的视频地址"}
+        return {"ok": False, "error": "请提供公网 http(s):// 的视频地址（已拦截内网/本机）"}
     ddir = os.path.join(WORKSPACES, "downloads", "videos")
     try:
         os.makedirs(ddir, exist_ok=True)
@@ -3886,9 +3922,9 @@ def api_url_dl_start(params):
     urls = params.get("urls") or []
     if isinstance(urls, str):
         urls = [urls]
-    urls = [str(u).strip() for u in urls if str(u).strip().startswith(("http://", "https://"))][:5]
+    urls = [str(u).strip() for u in urls if str(u).strip().startswith(("http://", "https://")) and _url_external_ok(u)][:5]
     if not urls:
-        return {"ok": False, "error": "请提供 http(s):// 的资源地址"}
+        return {"ok": False, "error": "请提供公网 http(s):// 的资源地址（已拦截内网/本机）"}
     mode = "ytdlp" if str(params.get("mode", "")).strip().lower() == "ytdlp" else "auto"
     ddir = os.path.join(WORKSPACES, "downloads", "videos")
     try:
@@ -4216,15 +4252,34 @@ class Handler(BaseHTTPRequestHandler):
         self.send_response(code)
         self.send_header("Content-Type", ctype)
         self.send_header("Content-Length", str(len(body)))
+        for k, v in _cors_allow(self).items():
+            self.send_header(k, v)
         if extra:
             for k, v in extra.items():
                 self.send_header(k, v)
         self.end_headers()
         self.wfile.write(body)
 
+    def _csrf_blocked(self):
+        """跨站请求防护：恶意网页的 fetch 一律拒绝（Sec-Fetch-Site 或 Origin 判定）"""
+        _s = (self.headers.get("Sec-Fetch-Site") or "").lower()
+        if _s == "cross-site":
+            return True
+        _o = self.headers.get("Origin") or ""
+        if _o:
+            try:
+                _h = (urllib.parse.urlparse(_o).hostname or "").lower().rstrip(".")
+            except Exception:
+                _h = ""
+            if _h not in ("127.0.0.1", "localhost", "::1"):
+                return True
+        return False
+
     def do_GET(self):
         parsed = urllib.parse.urlparse(self.path)
         params = {k: v[0] for k, v in urllib.parse.parse_qs(parsed.query).items()}
+        if self._csrf_blocked():
+            return self._send(403, b'{"ok":false,"error":"forbidden"}')
         try:
             if parsed.path == "/" or parsed.path == "/index.html" or parsed.path == "/app.html":
                 with open(os.path.join(BASE, "app.html"), "rb") as f:
@@ -4463,6 +4518,8 @@ class Handler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         parsed = urllib.parse.urlparse(self.path)
+        if self._csrf_blocked():
+            return self._send(403, b'{"ok":false,"error":"forbidden"}')
         ln = int(self.headers.get("Content-Length", 0))
         raw = self.rfile.read(ln) if ln else b""
         try:
