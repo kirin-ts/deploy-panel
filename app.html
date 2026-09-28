@@ -619,6 +619,16 @@ input:focus,textarea:focus{outline:none;border-color:var(--accent)}
           </div>
           <div id="m-read-body" style="margin-top:8px;max-height:70vh;overflow:auto;background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:14px;white-space:pre-wrap;line-height:1.9;font-size:15px"></div>
         </div>
+        <div style="margin-top:16px;border-top:1px solid var(--line);padding-top:12px">
+          <div class="mc-sec"><span class="ico" style="background:#00a1d6">🌐</span> 开放漫画库（免费公开 · 多语言，中文较少，英文名更全）</div>
+          <div style="display:flex;gap:8px;margin:8px 0;flex-wrap:wrap">
+            <input id="m-mdq" class="input" placeholder="搜漫画名（中英文均可，如 One Piece / 海贼王）" style="flex:1;min-width:240px" onkeydown="if(event.key==='Enter')mMdSearch()">
+            <button class="btn btn-primary" onclick="mMdSearch()">搜漫画库</button>
+          </div>
+          <div id="m-mdgrid" class="mc-grid" style="margin-top:6px"></div>
+          <div id="m-mdch" style="margin-top:8px"></div>
+          <div id="m-mdreader" style="margin-top:8px"></div>
+        </div>
         </div>
       </div>
     </section>
@@ -3038,10 +3048,10 @@ const _M_SITES=[["动漫之家","https://manhua.dmzj.com/","#ff5f6d","#ffc371","
 function mRenderSites(){
   const box=$("#m-comic-sites"); if(!box)return;
   if(box.children.length)return;
-  box.innerHTML=_M_SITES.map((st,i)=>'<div class="mc-card mc-site-card">'+
+  box.innerHTML=_M_SITES.map((st,i)=>'<div class="mc-card mc-site-card" style="cursor:pointer" title="点击进入站内直接阅读" onclick="mComicReadBySite('+i+')">'+
     '<div class="mc-cover" style="aspect-ratio:3/4;--c1:'+st[2]+';--c2:'+st[3]+'">'+
       '<span class="mc-badge">漫画站</span><div class="ph" style="font-size:40px">'+st[4]+'</div>'+
-      '<span class="mc-playic" style="font-size:13px">阅读</span></div>'+
+      '<span class="mc-playic" style="font-size:13px">点击阅读</span></div>'+
     '<div class="mc-body"><div class="mc-title">'+esc(st[0])+'</div>'+
     '<div class="mc-acts"><button class="btn btn-sm btn-primary" style="flex:1" onclick="mComicReadBySite('+i+')">粘贴地址阅读</button>'+
     '<button class="btn btn-sm" style="border-color:var(--text2);color:var(--text2)" onclick="mOpenSite(\''+st[1]+'\')" title="新标签打开站点">↗</button></div></div></div>').join("");
@@ -3158,6 +3168,52 @@ function mFont(d){const el=$("#m-read-body");let s=parseInt(el.style.fontSize||1
 /* ===== 媒体中心 · 小说/漫画 ===== */
 let mComicImgs=[], mComicIdx=0, mFontSz=15;
 function mBSug(t){$("#m-bq").value=t;mBSearch();}
+let _mMd=[],_mMdEps=[];
+async function mMdSearch(){
+  const q=$("#m-mdq").value.trim();
+  if(!q){toast("请输入漫画名（中英文均可）");return;}
+  const box=$("#m-mdgrid");
+  box.innerHTML='<div style="grid-column:1/-1;color:var(--text2);font-size:12px">搜索中…</div>';
+  const r=await apiPost("media/manga_search",{q:q});
+  if(!r.ok){box.innerHTML='<div style="grid-column:1/-1;color:#e07b7b;font-size:12px">'+(r.error||"搜索失败")+'</div>';return;}
+  const its=r.items||[];
+  if(!its.length){box.innerHTML='<div style="grid-column:1/-1;color:var(--text2);font-size:12px">未找到，换个关键词（英文名更全）</div>';return;}
+  _mMd=its;
+  box.innerHTML=its.map((it,i)=>'<div class="mc-card" style="cursor:pointer" title="查看章节" onclick="mMdChapters('+i+')">'+
+    '<div class="mc-cover" style="aspect-ratio:3/4;--c1:#4a90d9;--c2:#1f4e79">'+
+      (it.cover?'<img class="mc-img" src="'+esc(it.cover)+'" loading="lazy" alt="" referrerpolicy="no-referrer" onerror="this.remove()">':'')+
+      '<span class="mc-badge">开放库</span><div class="ph" style="font-size:34px">📘</div>'+
+      '<span class="mc-playic" style="font-size:12px">章节</span></div>'+
+    '<div class="mc-body"><div class="mc-title" style="font-size:13px">'+esc(it.title)+'</div></div></div>').join("");
+  const rd=document.getElementById("mc-sec-reader");
+  if(rd)rd.scrollIntoView({behavior:"smooth",block:"start"});
+}
+async function mMdChapters(i){
+  const it=_mMd[i]; if(!it)return;
+  const box=$("#m-mdch");
+  box.innerHTML='<div style="color:var(--text2);font-size:12px;margin:8px 0">「'+esc(it.title)+'」加载章节…</div>';
+  const r=await apiPost("media/manga_chapters",{manga_id:it.id});
+  if(!r.ok){box.innerHTML='<div style="color:#e07b7b;font-size:12px;margin:8px 0">'+(r.error||"章节获取失败")+'</div>';return;}
+  const eps=r.items||[];
+  if(!eps.length){box.innerHTML='<div style="color:var(--text2);font-size:12px;margin:8px 0">该漫画暂无免费章节（中文内容较少，可换英文名或其它漫画）</div>';return;}
+  _mMdEps=eps;
+  box.innerHTML='<div style="color:var(--text2);font-size:12px;margin:6px 0">「'+esc(it.title)+'」共 '+eps.length+' 章 · '+(eps[0].lang==="en"?"英文":"中文")+' · 最新在前，点章节直接阅读</div>'+
+    '<div style="max-height:260px;overflow-y:auto;display:flex;flex-wrap:wrap;gap:6px">'+
+    eps.map((e,j)=>'<button class="btn btn-sm" style="border-color:var(--text2);color:var(--text2)" onclick="mMdRead('+j+')">'+esc(e.label)+'</button>').join("")+'</div>';
+  const rd=document.getElementById("mc-sec-reader");
+  if(rd)rd.scrollIntoView({behavior:"smooth",block:"start"});
+}
+async function mMdRead(j){
+  const e=_mMdEps[j]; if(!e)return;
+  const box=$("#m-mdreader");
+  box.innerHTML='<div style="color:var(--text2);font-size:12px;margin:8px 0">加载图片…</div>';
+  const r=await apiPost("media/manga_pages",{chapter_id:e.id});
+  if(!r.ok){box.innerHTML='<div style="color:#e07b7b;font-size:12px;margin:8px 0">'+(r.error||"图片获取失败")+'</div>';return;}
+  box.innerHTML='<div style="margin:8px 0">'+esc(e.label)+' <span style="color:var(--text2);font-size:12px">('+r.images.length+' 页 · 向下滑动阅读)</span></div>'+
+    '<div style="text-align:center">'+r.images.map(u=>'<img src="'+esc(u)+'" loading="lazy" referrerpolicy="no-referrer" style="max-width:100%;display:block;margin:4px auto;border-radius:4px" alt="">').join("")+'</div>';
+  const rd=document.getElementById("mc-sec-reader");
+  if(rd)rd.scrollIntoView({behavior:"smooth",block:"start"});
+}
 function mComicReadBySite(i){
   const st=_M_SITES[i]; if(!st)return;
   const u=prompt("粘贴「"+st[0]+"」漫画/图集详情页 URL（仅公开免费章节，站内直接翻页阅读）：\n示例 "+st[1]);

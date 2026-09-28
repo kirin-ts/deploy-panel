@@ -1873,6 +1873,141 @@ def api_media_manga(params):
 
 
 
+def _md_api(u):
+    """MangaDex 开放 API 请求（官方接口，免登录；仅聚合公开元数据/直链）"""
+    import gzip as _gz
+    hd = {"User-Agent": "DeployPanel-Manga/1.0 (public free content aggregator)",
+          "Accept": "application/json", "Accept-Encoding": "gzip"}
+    try:
+        req = urllib.request.Request(u, headers=hd)
+        with urllib.request.urlopen(req, timeout=14) as r:
+            data = r.read()
+            if r.headers.get("Content-Encoding") == "gzip":
+                data = _gz.decompress(data)
+            return json.loads(data.decode("utf-8", "ignore"))
+    except Exception as _e:
+        raise RuntimeError(str(_e)[:120])
+
+
+def _md_title(t):
+    """优先取中文标题，其次英文/罗马音"""
+    if not isinstance(t, dict):
+        return ""
+    for k in ("zh", "zh-hk", "zh-tw", "zh-ro", "en", "ja", "ko"):
+        v = t.get(k)
+        if isinstance(v, str) and v.strip():
+            return v.strip()
+    for v in t.values():
+        if isinstance(v, str) and v.strip():
+            return v.strip()
+    return ""
+
+
+def api_media_manga_search(params):
+    """POST {q, limit?} → MangaDex 公开漫画搜索（标题+封面+id，中文标题优先）"""
+    q = str(params.get("q") or "").strip()
+    if not q:
+        return {"ok": False, "error": "请输入漫画名称"}
+    limit = min(int(params.get("limit") or 30), 48)
+    try:
+        import urllib.parse as _up
+        url = ("https://api.mangadex.org/manga?limit=%d&includes%%5B%%5D=cover_art&title=%s"
+               % (limit, _up.quote(q)))
+        d = _md_api(url)
+        raw = []
+        for it in (d.get("data") or []):
+            mid = it.get("id") or ""
+            if not mid:
+                continue
+            attrs = it.get("attributes") or {}
+            title = _md_title(attrs.get("title"))
+            cover = ""
+            for rel in (it.get("relationships") or []):
+                if rel.get("type") == "cover_art":
+                    fn = ((rel.get("attributes") or {}).get("fileName") or "")
+                    if fn:
+                        cover = "https://uploads.mangadex.org/covers/%s/%s" % (mid, fn)
+            # 汇总全部别名（含中文/英文），用于本地相关性过滤
+            alias = []
+            for x in (attrs.get("altTitles") or []):
+                if isinstance(x, dict):
+                    alias.extend([str(v) for v in x.values() if isinstance(v, str) and v.strip()])
+            alias.append(title)
+            raw.append({"id": mid, "title": title, "cover": cover, "alias": alias, "q": q.lower()})
+        # 过滤：别名含搜索词（子串）优先；无命中则全部保留（提示近似）
+        hit = [r for r in raw if any(q.lower() in a.lower() for a in r["alias"])]
+        pool = hit if hit else raw
+        items = [{"id": r["id"], "title": r["title"], "cover": r["cover"]} for r in pool[:24]]
+        return {"ok": True, "items": items, "matched": bool(hit)}
+    except Exception as e:
+        return {"ok": False, "error": "漫画库搜索失败：" + str(e)[:120]}
+
+
+def api_media_manga_chapters(params):
+    """POST {manga_id} → 章节列表（中文翻译优先，无中文回退英文，最新在前）"""
+    mid = str(params.get("manga_id") or "").strip()
+    if not mid:
+        return {"ok": False, "error": "缺少 manga_id"}
+    try:
+        d = _md_api("https://api.mangadex.org/manga/%s/feed?translatedLanguage%%5B%%5D=zh&"
+                    "translatedLanguage%%5B%%5D=zh-hk&translatedLanguage%%5B%%5D=zh-tw&"
+                    "order%%5Bchapter%%5D=asc&limit=500&contentRating%%5B%%5D=safe&"
+                    "contentRating%%5B%%5D=suggestive&contentRating%%5B%%5D=erotica" % mid)
+        eps = []
+        for it in (d.get("data") or []):
+            a = it.get("attributes") or {}
+            # 外部链接章节图片不在 MangaDex 服务器（at-home 必然 404），跳过
+            if a.get("externalUrl"):
+                continue
+            ch = str(a.get("chapter") or "").strip()
+            t = str(a.get("title") or "").strip()
+            if not ch:
+                continue
+            label = ("第%s话 %s" % (ch, t)).strip() if t else ("第%s话" % ch)
+            eps.append({"id": it.get("id") or "", "label": label, "lang": "zh"})
+        if not eps:
+            # 无中文翻译时回退英文，保证至少可看图（公开免费章节）
+            d = _md_api("https://api.mangadex.org/manga/%s/feed?translatedLanguage%%5B%%5D=en&"
+                        "order%%5Bchapter%%5D=asc&limit=500&contentRating%%5B%%5D=safe&"
+                        "contentRating%%5B%%5D=suggestive" % mid)
+            for it in (d.get("data") or []):
+                a = it.get("attributes") or {}
+                if a.get("externalUrl"):
+                    continue
+                ch = str(a.get("chapter") or "").strip()
+                t = str(a.get("title") or "").strip()
+                if not ch:
+                    continue
+                label = ("Ch.%s %s" % (ch, t)).strip() if t else ("Ch.%s" % ch)
+                eps.append({"id": it.get("id") or "", "label": label, "lang": "en"})
+        eps.reverse()  # 最新在前
+        return {"ok": True, "items": eps}
+    except Exception as e:
+        return {"ok": False, "error": "章节获取失败：" + str(e)[:120]}
+
+
+def api_media_manga_pages(params):
+    """POST {chapter_id} → 章节图片直链列表（MangaDex at-home 服务器）"""
+    cid = str(params.get("chapter_id") or "").strip()
+    if not cid:
+        return {"ok": False, "error": "缺少 chapter_id"}
+    try:
+        d = _md_api("https://api.mangadex.org/at-home/server/" + cid)
+        base = (d.get("baseUrl") or "").rstrip("/")
+        ch = d.get("chapter") or {}
+        h = ch.get("hash") or ""
+        files = ch.get("data") or []
+        imgs = []
+        for f in files:
+            if f.endswith((".jpg", ".png", ".webp", ".jpeg")):
+                imgs.append("%s/data/%s/%s" % (base, h, f))
+        if not imgs:
+            return {"ok": False, "error": "未获取到图片（章节可能不可用）"}
+        return {"ok": True, "images": imgs}
+    except Exception as e:
+        return {"ok": False, "error": "图片获取失败：" + str(e)[:120]}
+
+
 def _cls_tag(title):
     """按标题关键词给内容分类（教程/音乐MV/解说/剪辑合集/纪录片/影视剧集/游戏/直播/其他）"""
     t = (title or "").lower()
@@ -4565,6 +4700,12 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send(200, json.dumps(api_media_article(body), ensure_ascii=False).encode("utf-8"))
             if parsed.path == "/api/media/manga":
                 return self._send(200, json.dumps(api_media_manga(body), ensure_ascii=False).encode("utf-8"))
+            if parsed.path == "/api/media/manga_search":
+                return self._send(200, json.dumps(api_media_manga_search(body), ensure_ascii=False).encode("utf-8"))
+            if parsed.path == "/api/media/manga_chapters":
+                return self._send(200, json.dumps(api_media_manga_chapters(body), ensure_ascii=False).encode("utf-8"))
+            if parsed.path == "/api/media/manga_pages":
+                return self._send(200, json.dumps(api_media_manga_pages(body), ensure_ascii=False).encode("utf-8"))
             if parsed.path == "/api/media/filters":
                 return self._send(200, json.dumps(api_media_filters(body), ensure_ascii=False).encode("utf-8"))
             if parsed.path == "/api/media/nofilter":
