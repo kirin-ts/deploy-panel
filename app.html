@@ -331,6 +331,8 @@ input:focus,textarea:focus{outline:none;border-color:var(--accent)}
 .mc-chipbar{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;align-items:center;background:var(--bg,#fff);border:1px solid var(--line,#e5e7eb);border-radius:10px;padding:7px 10px}
 .mc-chipbar .lbl{color:var(--text2);font-size:12px}
 
+#ua-vresults .mc-card{cursor:pointer}
+#ua-vresults .mc-card:hover .mc-playic{opacity:1}
 .mc-img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;border-radius:inherit}
 .mc-navchips{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;align-items:center}
 .mc-navchips .lbl{color:var(--text2);font-size:12px}
@@ -2760,14 +2762,13 @@ function uaWebRender(r){
   items.forEach((it,i)=>{
     const d=(it.domain||"").replace(/^www\./,"")||"网页";
     const ph=(it.title||"?").trim().slice(0,1)||"?";
-    html+='<div class="mc-card">'+
+    html+='<div class="mc-card" onclick="uaWebPlay('+i+')" title="点击解析播放">'+
       _mcCover(ph, "", (it.level===2?"视频平台":"网页"), it.pic)+
       '<div class="mc-body"><div class="mc-title">'+esc(it.title)+'</div>'+
       '<div class="mc-meta"><span>'+esc(d)+'</span></div>'+
       '<div class="mc-acts">'+
-      '<button class="btn btn-sm" style="border-color:#4fd08a;color:#4fd08a;flex:1" onclick="uaWebPlay('+i+')">▶ 解析播放</button>'+
-      '<button class="btn btn-sm" style="border-color:var(--accent);color:var(--accent)" onclick="uaWebDl('+i+')">下载</button>'+
-      '<a class="btn btn-sm" style="text-decoration:none;border-color:var(--text2);color:var(--text2)" href="'+esc(it.url)+'" target="_blank" rel="noopener" title="打开原网页">↗</a>'+
+      '<button class="btn btn-sm" style="border-color:var(--accent);color:var(--accent);flex:1" onclick="uaWebDl('+i+');event.stopPropagation()">下载</button>'+
+      '<a class="btn btn-sm" style="text-decoration:none;border-color:var(--text2);color:var(--text2)" href="'+esc(it.url)+'" target="_blank" rel="noopener" title="打开原网页" onclick="event.stopPropagation()">↗</a>'+
       '</div></div></div>';
   });
   box.innerHTML=html;
@@ -2827,12 +2828,11 @@ function uaVRender(){
       const gi=items.indexOf(it);
       const ph=(it.platform||"?").trim().slice(0,1)||"?";
       const meta=(it.author?esc(it.author):"-")+(it.duration?(' · '+esc(it.duration)):'');
-      let acts='<button class="btn btn-sm" style="border-color:#4fd08a;color:#4fd08a;flex:1" onclick="uaVPlay('+gi+')">▶ 播放</button>'+
-        '<button class="btn btn-sm" style="border-color:var(--accent);color:var(--accent)" onclick="uaVDl('+gi+')">下载</button>';
+      let acts='<button class="btn btn-sm" style="border-color:var(--accent);color:var(--accent)" onclick="uaVDl('+gi+');event.stopPropagation()">下载</button>';
       if(it.kind==="bangumi"||(it.kind==="video" && /(bilibili\.com|b23\.tv)/.test(it.url||""))){
-        acts+='<button class="btn btn-sm" style="border-color:#d0a64f;color:#d0a64f" onclick="uaVEps('+gi+')">分集/分P</button>';
+        acts+='<button class="btn btn-sm" style="border-color:#d0a64f;color:#d0a64f" onclick="uaVEps('+gi+');event.stopPropagation()">分集/分P</button>';
       }
-      html+='<div class="mc-card'+(i===0?' mc-feat':'')+'">'+
+      html+='<div class="mc-card'+(i===0?' mc-feat':'')+'" onclick="uaVPlay('+gi+')" title="点击播放">'+
         _mcCover(ph, it.duration, it.platform, it.pic)+
         '<div class="mc-body"><div class="mc-title">'+esc(it.title)+'</div>'+
         '<div class="mc-meta"><span>'+meta+'</span>'+(it.play?'<span class="pl">▶ '+esc(it.play)+'</span>':'')+'</div>'+
