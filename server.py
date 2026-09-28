@@ -2303,7 +2303,12 @@ def api_video_search(params):
             return ("bili_" + st, [], False)
     def _run_web():
         try:
-            its = _web_engine_bing_videos(q)
+            # 全网多平台通道：多搜索引擎（必应/百度/搜狗/360）+ 免费平台定向，按平台域名标记
+            res = _web_video_search(q, page)
+            its = []
+            for it in (res.get("items") or []):
+                its.append({"title": it.get("title") or "", "url": it.get("url") or "",
+                            "engine": it.get("engine") or "全网搜索"})
             return ("web", its, True)
         except Exception:
             return ("web", [], False)
@@ -2336,11 +2341,11 @@ def api_video_search(params):
             continue
         seen.add(key)
         dedup.append(it)
-    # 单平台配额平衡（每平台最多 8 条，让位给更多来源）
+    # 单平台配额平衡（每平台最多 6 条，让位给更多来源）
     dom_cnt, capped = {}, []
     for it in dedup:
         dom = it.get("platform") or ""
-        if dom_cnt.get(dom, 0) >= 8:
+        if dom_cnt.get(dom, 0) >= 6:
             continue
         dom_cnt[dom] = dom_cnt.get(dom, 0) + 1
         capped.append(it)
@@ -2378,7 +2383,6 @@ def api_url_playinfo(params):
     if not u.startswith(("http://", "https://")):
         return {"ok": False, "error": "请提供 http(s):// 链接"}
     try:
-        task.update(phase="解析中")
         cached = _play_cache_get(u)
         if cached is not None:
             if cached.get("err"):
@@ -2405,6 +2409,40 @@ def api_url_play(self, params):
     ref = str(params.get("ref") or "").strip()
     if not u.startswith(("http://", "https://")):
         self._send(400, "text/plain; charset=utf-8", "bad url"); return
+    # 网页 URL 自动解析直链（缓存优先）：让前端同步设 src + play() 保留手势 → 点开即播
+    try:
+        from urllib.parse import urlparse as _up
+        _pp = _up(u)
+        _host = (_pp.hostname or "").lower()
+        _path = (_pp.path or "").lower()
+        _plat = ("bilibili.com" in _host or "douyin.com" in _host or "ixigua.com" in _host or
+                 "cctv.com" in _host or "1905.com" in _host or "163.com" in _host or
+                 "qq.com" in _host or "youku.com" in _host or "mgtv.com" in _host or
+                 "sohu.com" in _host or "acfun.cn" in _host or "huya.com" in _host or
+                 "douyu.com" in _host or "youtube.com" in _host or "vimeo.com" in _host or
+                 "archive.org" in _host)
+        _is_direct = _path.endswith((".mp4", ".m4s", ".webm", ".flv", ".mov", ".m3u8")) or _host.startswith(("upos", "aliyun", "vdse", "v.kuaishou", "txmov2"))
+        if _plat and not _is_direct:
+            try:
+                _ci = _play_cache_get(u)
+                if _ci is None:
+                    _ci = _yt_playinfo(u)
+                    _play_cache_put(u, info=_ci)
+                elif isinstance(_ci, dict) and _ci.get("info") is not None:
+                    _ci = _ci["info"]  # 缓存返回整条目，取 info 部分
+            except Exception as _e:
+                self._send(502, json.dumps({"ok": False, "error": "源站解析失败：%s（可能需登录或平台风控，请稍后重试）" % str(_e)[:90]}).encode("utf-8"), "application/json; charset=utf-8")
+                return
+            if not (isinstance(_ci, dict) and _ci.get("url")):
+                self._send(502, json.dumps({"ok": False, "error": "未解析到可播放直链（可能需登录或会员）"}).encode("utf-8"), "application/json; charset=utf-8")
+                return
+            if not a and _ci.get("aurl"):
+                a = _ci["aurl"]
+            if not ref:
+                ref = u
+            u = _ci["url"]
+    except Exception:
+        pass  # 平台识别异常按直链代理原样处理
     ua = _DL_UA_POOL[0] if isinstance(_DL_UA_POOL, list) and _DL_UA_POOL else "Mozilla/5.0"
     hd = {"User-Agent": ua, "Accept": "*/*"}
     if ref.startswith(("http://", "https://")):
@@ -2420,18 +2458,33 @@ def api_url_play(self, params):
                      "-c", "copy", "-movflags", "frag_keyframe+empty_moov",
                      "-f", "mp4", "pipe:1"],
                     stdout=subprocess.PIPE, stderr=subprocess.DEVNULL, bufsize=0)
+                # 首字节 15s 超时：拉流/合并卡住时立即 502，避免浏览器长期无数据
+                _first_q = []
+                def _read_first():
+                    _first_q.append(proc.stdout.read(64 * 1024))
+                _th = threading.Thread(target=_read_first, daemon=True)
+                _th.start()
+                _th.join(15)
+                blk = _first_q[0] if _first_q else b""
+                if not blk:
+                    try:
+                        proc.terminate()
+                    except Exception:
+                        pass
+                    self._send(502, json.dumps({"ok": False, "error": "视频源拉取超时，请稍后重试"}).encode("utf-8"), "application/json; charset=utf-8")
+                    return
                 self.send_response(200)
                 self.send_header("Content-Type", "video/mp4")
                 self.send_header("Accept-Ranges", "none")
                 self.send_header("Access-Control-Allow-Origin", "*")
                 self.end_headers()
                 while True:
-                    blk = proc.stdout.read(64 * 1024)
-                    if not blk:
-                        break
                     try:
                         self.wfile.write(blk)
                     except Exception:
+                        break
+                    blk = proc.stdout.read(64 * 1024)
+                    if not blk:
                         break
                 try:
                     proc.terminate()
@@ -2446,8 +2499,11 @@ def api_url_play(self, params):
         if rng:
             req.add_header("Range", rng)
         with urllib.request.urlopen(req, timeout=30) as resp:
-            self.send_response(resp.status)
             ct = resp.headers.get("Content-Type") or "application/octet-stream"
+            if "text/html" in ct or "text/plain" in ct:
+                self._send(502, json.dumps({"ok": False, "error": "源站返回网页而非媒体流（直链失效或需登录）"}).encode("utf-8"), "application/json; charset=utf-8")
+                return
+            self.send_response(resp.status)
             if "octet-stream" in ct and ("stream" in ct or True):
                 low = u.lower().split("?")[0]
                 if low.endswith(".mp4"):
@@ -2856,8 +2912,8 @@ def _yt_playinfo(u):
         raise RuntimeError("yt-dlp 未安装。请运行: python -m pip install yt-dlp 后重启面板。")
     import yt_dlp
     opts = {"quiet": True, "no_warnings": True, "noplaylist": True,
-            "socket_timeout": 18, "nocheckcertificate": True, "retries": 1,
-            "extractor_retries": 1}
+            "socket_timeout": 20, "nocheckcertificate": True, "retries": 2,
+            "extractor_retries": 2}
     with yt_dlp.YoutubeDL(opts) as ydl:
         info = ydl.extract_info(u, download=False)
     if not info:

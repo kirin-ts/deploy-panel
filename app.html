@@ -2565,7 +2565,8 @@ async function uaPlayPrep(u,title){
   },700);
 }
 function uaPlayClose(){
-  const pv=$("#ua-play-video"); pv.pause(); pv.removeAttribute("src"); pv.load();
+  const pv=$("#ua-play-video"); _uaStream=null; pv.onerror=null;
+  pv.pause(); pv.removeAttribute("src"); pv.load();
   pv.style.display="none";
   $("#ua-play-prog").style.display="none";
   $("#ua-play-mask").classList.add("hidden");
@@ -2803,8 +2804,7 @@ async function uaVEps(i){
 }
 function uaVPlayUrl(url,title){
   if(!url){toast("无播放地址");return;}
-  if(window._uaSecLevel==="danger"){toast("危险站点已禁止");return;}
-  uaPlayPrep(url,title||"选集播放");
+  uaPlayEx(url,title||"选集播放");
 }
 function uaVDlUrl(url){
   if(!url){toast("无下载地址");return;}
@@ -2814,10 +2814,34 @@ function uaVDlUrl(url){
 
 function uaVQ(t){$("#ua-vq").value=t;window._uaVLastQ=t;uaVSearch();}
 function uaVSug(b){uaVQ((b.dataset.q||'').trim());}
+let _uaStream=null;
+function uaPlayEx(u,title){
+  if(window._uaSecLevel==="danger"){toast("危险站点已禁止");return;}
+  const mask=$("#ua-play-mask"), v=$("#ua-play-video");
+  $("#ua-play-title").textContent=title||"播放中";
+  mask.classList.remove("hidden");
+  $("#ua-play-prog").style.display="none";
+  v.style.display=""; v.src=""; v.onerror=null; v.onplay=null;
+  // 流式代理（后端自动解析直链，缓存优先）：同步设 src + play() 保留用户手势 → 点开即播
+  v.src="api/url/play?url="+encodeURIComponent(u);
+  v.play().catch(()=>{});
+  const done=()=>{ if(_uaStream===v){_uaStream=null; v.onerror=null;} };
+  _uaStream=v;
+  v.onplay=done;
+  v.onerror=()=>{ done(); uaPlayClose(); toast("流式播放失败，改用完整下载模式…"); uaPlayPrep(u,title); };
+  // 12s 内无数据（解析失败/需登录/源不可达）→ 抖音类提示打开原网页，其余回退完整下载
+  setTimeout(()=>{
+    if(_uaStream!==v) return;
+    if(v.readyState<2){
+      done(); uaPlayClose();
+      if(/douyin|kuaishou/i.test(u)){ toast("该平台需登录或浏览器 cookies，无法直接播放，已打开原网页观看"); window.open(u,"_blank"); }
+      else { toast("流式加载超时，改用完整下载模式…"); uaPlayPrep(u,title); }
+    }
+  },12000);
+}
 function uaVPlay(i){
   const it=(window._uaVItems||[])[i]; if(!it)return;
-  if(window._uaSecLevel==="danger"){toast("危险站点已禁止");return;}
-  uaPlayPrep(it.url,it.title);
+  uaPlayEx(it.url,it.title);
 }
 function uaVDl(i){
   const it=(window._uaVItems||[])[i]; if(!it)return;
@@ -2852,8 +2876,18 @@ async function mSearch(){
       '<div style="font-size:13px;font-weight:600;word-break:break-all">'+esc(it.title)+'</div>'+
       '<div style="color:var(--text2);font-size:11px;margin-top:2px">'+esc(it.author||"-")+' · '+esc(it.duration||"-")+' · 来源：'+esc(it.platform||"-")+'</div>'+
       '<div style="display:flex;gap:6px;margin-top:6px">'+
-      '<button class="btn btn-sm" style="border-color:#4fd08a;color:#4fd08a" onclick="mPlay('+i+')">▶ 播放</button>'+
+      '<button class="btn btn-sm" style="border-color:#4fd08a;color:#4fd08a" onclick="mPlayEx('+i+')">▶ 播放</button>'+
       '</div></div>').join("");
+}
+function mPlayEx(i){
+  const it=(mItems||[])[i]; if(!it)return;
+  const a=$("#m-audio"); a.pause(); a.src=""; a.onerror=null;
+  if(mTmp){api("url/play_clean",{path:mTmp}).then(()=>{});mTmp=null;}
+  toast("点开即播…（流式代理）");
+  a.onerror=()=>{ a.onerror=null; a.src=""; toast("流式播放失败，改用完整下载模式…"); mPlay(i); };
+  a.src="api/url/play?url="+encodeURIComponent(it.url);
+  a.play().catch(()=>{});
+  setTimeout(()=>{ if(!a.paused || a.readyState>=2) return; a.onerror=null; a.src=""; toast("流式加载超时，改用完整下载模式…"); mPlay(i); },15000);
 }
 async function mPlay(i){
   const it=(mItems||[])[i]; if(!it)return;
