@@ -372,7 +372,7 @@ input:focus,textarea:focus{outline:none;border-color:var(--accent)}
     <section id="view-search">
       <div class="card">
         <div class="search-row">
-          <input type="text" id="search-input" placeholder="输入关键词搜索 GitHub 项目，如：game1024 openspeedy / 任务看板 / todo app">
+          <input type="text" id="search-input" placeholder="输入关键词搜索 GitHub 项目，如：game1024 openspeedy / 任务看板 / todo app" onkeydown="if(event.key==='Enter')doSearch()">
           <button class="btn btn-primary" id="search-btn">搜索</button>
           <div id="suggest-box" class="hidden"></div>
         </div>
@@ -518,7 +518,7 @@ input:focus,textarea:focus{outline:none;border-color:var(--accent)}
         <div id="mt-panel-video">
         <div class="ua-card" style="border-radius:12px">
           <div class="mc-search">
-            <input id="ua-vq" class="input" placeholder="搜全网公开视频：纪录片 / 公开课 / 电影 / 剧集…">
+            <input id="ua-vq" class="input" placeholder="搜全网公开视频：纪录片 / 公开课 / 电影 / 剧集…" onkeydown="if(event.key==='Enter')uaVSearch()">
             <button class="btn btn-primary" onclick="uaVSearch()">🔍 搜索</button>
           </div>
           <div id="ua-vq-sug" class="mc-hot">
@@ -544,7 +544,7 @@ input:focus,textarea:focus{outline:none;border-color:var(--accent)}
         <div id="mt-panel-music" class="hidden">
         <div class="ua-card" style="border-radius:12px">
           <div class="mc-search">
-            <input id="m-q" class="input" placeholder="搜音乐：歌名 / 歌手，如：周杰伦 晴天">
+            <input id="m-q" class="input" placeholder="搜音乐：歌名 / 歌手，如：周杰伦 晴天" onkeydown="if(event.key==='Enter')mSearch()">
             <button class="btn btn-primary" onclick="mSearch()">🔍 搜索</button>
           </div>
           <div class="mc-navchips">
@@ -575,9 +575,9 @@ input:focus,textarea:focus{outline:none;border-color:var(--accent)}
         <div id="mt-panel-book" class="hidden">
         <div class="ua-card" style="border-radius:12px">
           <div class="mc-search" style="flex-wrap:wrap">
-            <input id="m-bq" class="input" placeholder="🔍 搜公开小说名（如：三体）" style="flex:1;min-width:240px">
+            <input id="m-bq" class="input" placeholder="🔍 搜公开小说名（如：三体）" style="flex:1;min-width:240px" onkeydown="if(event.key==='Enter')mBSearch()">
             <button class="btn btn-primary" onclick="mBSearch()">搜公开内容</button>
-            <input id="m-book-url" class="input" placeholder="或粘贴小说/文章页 URL（提取正文阅读）" style="flex:1;min-width:240px">
+            <input id="m-book-url" class="input" placeholder="或粘贴小说/文章页 URL（提取正文阅读）" style="flex:1;min-width:240px" onkeydown="if(event.key==='Enter')mBookLoad()">
             <button class="btn btn-primary" onclick="mBookLoad()">读正文</button>
           </div>
           <div class="mc-navchips">
@@ -604,7 +604,7 @@ input:focus,textarea:focus{outline:none;border-color:var(--accent)}
           <div id="m-comic-sites" class="mc-grid" style="margin-top:8px"></div>
           <div class="mc-sec" id="mc-sec-reader"><span class="ico" style="background:#ff5f6d">📖</span> 漫画/小说阅读器（粘贴链接站内直接阅读/翻页）</div>
           <div class="mc-search" style="flex-wrap:wrap">
-            <input id="m-comic-url" class="input" placeholder="或粘贴漫画/图集页 URL（提取图片翻页）" style="flex:1;min-width:240px">
+            <input id="m-comic-url" class="input" placeholder="或粘贴漫画/图集页 URL（提取图片翻页）" style="flex:1;min-width:240px" onkeydown="if(event.key==='Enter')mComicLoad()">
             <button class="btn btn-primary" onclick="mComicLoad()">看图</button>
             <span id="m-comic-nav" style="font-size:12px;color:var(--text2);align-self:center"></span>
           </div>
