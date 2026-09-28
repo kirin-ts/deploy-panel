@@ -330,6 +330,14 @@ input:focus,textarea:focus{outline:none;border-color:var(--accent)}
 .mc-sec{font-size:15px;font-weight:700;display:flex;align-items:center;gap:6px;margin:14px 0 4px}
 .mc-chipbar{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;align-items:center;background:var(--bg,#fff);border:1px solid var(--line,#e5e7eb);border-radius:10px;padding:7px 10px}
 .mc-chipbar .lbl{color:var(--text2);font-size:12px}
+
+.mc-navchips{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;align-items:center}
+.mc-navchips .lbl{color:var(--text2);font-size:12px}
+.mc-feat{grid-column:span 2}
+.mc-sec .ico{width:20px;height:20px;border-radius:6px;display:inline-flex;align-items:center;justify-content:center;font-size:12px;color:#fff;flex:none}
+.mc-pl-card{cursor:pointer;position:relative}
+.mc-pl-card:hover{border-color:var(--accent)}
+.mc-site-card .mc-title{min-height:0}
 #ua-script-pre,#ua-out-pre{overflow:auto;background:#0b0e13;border:1px solid var(--line);border-radius:8px;padding:12px;font-family:Consolas,Menlo,monospace;font-size:12px;line-height:1.6;color:#d8dee9;white-space:pre;margin-top:8px;max-height:46vh}
 </style>
 </head>
@@ -538,8 +546,16 @@ input:focus,textarea:focus{outline:none;border-color:var(--accent)}
             <input id="m-q" class="input" placeholder="搜音乐：歌名 / 歌手，如：周杰伦 晴天">
             <button class="btn btn-primary" onclick="mSearch()">🔍 搜索</button>
           </div>
+          <div class="mc-navchips">
+            <span class="lbl">频道：</span>
+            <button class="btn btn-ghost btn-sm" onclick="mNav('recommend')">🎧 推荐</button>
+            <button class="btn btn-ghost btn-sm" onclick="mNav('rank')">🔥 排行</button>
+            <button class="btn btn-ghost btn-sm" onclick="mNav('playlist')">📋 歌单</button>
+          </div>
+          <div class="mc-sec" id="mc-sec-playlist"><span class="ico" style="background:#ff5f6d">♫</span> 歌单广场</div>
+          <div id="m-pl" class="mc-grid"></div>
+          <div class="mc-sec" id="mc-sec-rank"><span class="ico" style="background:#ff9f43">▶</span> 音乐热榜</div>
           <div id="m-sug" class="mc-hot">
-            <span class="lbl">音乐热榜：</span>
             <button class="btn btn-ghost btn-sm" onclick="mSug('周杰伦 晴天')">周杰伦 晴天</button>
             <button class="btn btn-ghost btn-sm" onclick="mSug('稻香')">稻香</button>
             <button class="btn btn-ghost btn-sm" onclick="mSug('起风了')">起风了</button>
@@ -547,17 +563,12 @@ input:focus,textarea:focus{outline:none;border-color:var(--accent)}
             <button class="btn btn-ghost btn-sm" onclick="mSug('平凡之路')">平凡之路</button>
             <button class="btn btn-ghost btn-sm" onclick="mSug('贝加尔湖畔')">贝加尔湖畔</button>
           </div>
-          <div id="m-pl" class="mc-hot">
-            <span class="lbl">歌单：</span>
-            <button class="btn btn-ghost btn-sm" onclick="mSug('经典老歌')">经典老歌</button>
-            <button class="btn btn-ghost btn-sm" onclick="mSug('华语流行')">华语流行</button>
-            <button class="btn btn-ghost btn-sm" onclick="mSug('民谣')">民谣</button>
-            <button class="btn btn-ghost btn-sm" onclick="mSug('轻音乐')">轻音乐</button>
-            <button class="btn btn-ghost btn-sm" onclick="mSug('影视原声')">影视原声</button>
-            <button class="btn btn-ghost btn-sm" onclick="mSug('钢琴曲')">钢琴曲</button>
-          </div>
+          <div class="mc-sec" id="mc-sec-result"><span class="ico" style="background:#4fd08a">♬</span> 搜索结果</div>
           <div id="m-results" class="mc-grid"></div>
-          <div class="mc-playerbar"><audio id="m-audio" controls preload="none" style="display:block"></audio></div>
+          <div class="mc-playerbar">
+            <div id="m-now" style="font-size:12px;color:var(--text2);margin-bottom:6px">♪ 未在播放 · 点击卡片「播放」</div>
+            <audio id="m-audio" controls preload="none" style="display:block"></audio>
+          </div>
         </div>
         </div>
         <div id="mt-panel-book" class="hidden">
@@ -568,8 +579,17 @@ input:focus,textarea:focus{outline:none;border-color:var(--accent)}
             <input id="m-book-url" class="input" placeholder="或粘贴小说/文章页 URL（提取正文阅读）" style="flex:1;min-width:240px">
             <button class="btn btn-primary" onclick="mBookLoad()">读正文</button>
           </div>
+          <div class="mc-navchips">
+            <span class="lbl">频道：</span>
+            <button class="btn btn-ghost btn-sm" onclick="mBNav('男生')">男生</button>
+            <button class="btn btn-ghost btn-sm" onclick="mBNav('女生')">女生</button>
+            <button class="btn btn-ghost btn-sm" onclick="mBNav('国漫')">国漫</button>
+            <button class="btn btn-ghost btn-sm" onclick="mBNav('日漫')">日漫</button>
+            <button class="btn btn-ghost btn-sm" onclick="mBNav('玄幻')">玄幻</button>
+            <button class="btn btn-ghost btn-sm" onclick="mBNav('科幻')">科幻</button>
+          </div>
+          <div class="mc-sec"><span class="ico" style="background:#6f4e37">🔥</span> 小说热榜</div>
           <div id="mb-sug" class="mc-hot">
-            <span class="lbl">小说热榜：</span>
             <button class="btn btn-ghost btn-sm" onclick="mBSug('三体')">三体</button>
             <button class="btn btn-ghost btn-sm" onclick="mBSug('盗墓笔记')">盗墓笔记</button>
             <button class="btn btn-ghost btn-sm" onclick="mBSug('鬼吹灯')">鬼吹灯</button>
@@ -577,14 +597,10 @@ input:focus,textarea:focus{outline:none;border-color:var(--accent)}
             <button class="btn btn-ghost btn-sm" onclick="mBSug('活着')">活着</button>
             <button class="btn btn-ghost btn-sm" onclick="mBSug('平凡的世界')">平凡的世界</button>
           </div>
+          <div class="mc-sec"><span class="ico" style="background:#ff5f6d">📚</span> 搜索结果</div>
           <div id="m-bresults" class="mc-grid"></div>
-          <div class="mc-hot" id="m-comic-sites">
-            <span class="lbl">🖼 漫画站（仅公开免费章节，点开浏览）：</span>
-            <button class="btn btn-ghost btn-sm" onclick="mOpenSite('https://manhua.dmzj.com/')">动漫之家</button>
-            <button class="btn btn-ghost btn-sm" onclick="mOpenSite('https://www.kuaikanmanhua.com/')">快看漫画</button>
-            <button class="btn btn-ghost btn-sm" onclick="mOpenSite('https://manga.bilibili.com/')">哔哩漫画</button>
-            <button class="btn btn-ghost btn-sm" onclick="mOpenSite('https://ac.qq.com/Comic/all')">腾讯动漫</button>
-          </div>
+          <div class="mc-sec"><span class="ico" style="background:#7c4dff">🖼</span> 漫画站点（仅公开免费章节）</div>
+          <div id="m-comic-sites" class="mc-grid" style="margin-top:8px"></div>
           <div class="mc-search" style="flex-wrap:wrap">
             <input id="m-comic-url" class="input" placeholder="或粘贴漫画/图集页 URL（提取图片翻页）" style="flex:1;min-width:240px">
             <button class="btn btn-primary" onclick="mComicLoad()">看图</button>
@@ -2607,6 +2623,8 @@ function mtTab(name,btn){
     const p=$("#mt-panel-"+n);
     if(p)p.classList.toggle("hidden",n!==name);
   });
+  if(name==="music"){mRenderPl();}
+  if(name==="book"){mRenderSites();}
   document.querySelectorAll(".mt-tab-btn").forEach(b=>{
     const on=b.getAttribute("data-tab")===name;
     b.style.borderColor=on?"var(--accent)":"";
@@ -2799,7 +2817,8 @@ function uaVRender(){
   if(!filtered.length){html+='<div style="grid-column:1/-1;color:var(--text2);font-size:12px">该分类暂无内容，可切回「全部」查看</div>';}
   keys.forEach(tag=>{
     const g=groups[tag];
-    html+='<div style="grid-column:1/-1;font-size:13px;font-weight:700;color:var(--accent);margin-top:12px;display:flex;align-items:center;gap:6px">▍'+esc(tag)+'<span style="font-weight:400;color:var(--text2);font-size:11px">'+g.length+' 条</span></div>';
+    const ico=tag==="纪录片"?"#38ef7d":tag==="公开课"?"#00a1d6":tag==="音乐MV"?"#ff9f43":tag==="影视剧集"?"#ff5f6d":"#7c4dff";
+    html+='<div style="grid-column:1/-1;font-size:14px;font-weight:700;color:var(--text);margin-top:14px;display:flex;align-items:center;gap:6px"><span class="ico" style="background:'+ico+'">▶</span>'+esc(tag)+'<span style="font-weight:400;color:var(--text2);font-size:11px">'+g.length+' 条</span></div>';
     g.forEach((it,i)=>{
       const gi=items.indexOf(it);
       const ph=(it.platform||"?").trim().slice(0,1)||"?";
@@ -2809,7 +2828,7 @@ function uaVRender(){
       if(it.kind==="bangumi"||(it.kind==="video" && /(bilibili\.com|b23\.tv)/.test(it.url||""))){
         acts+='<button class="btn btn-sm" style="border-color:#d0a64f;color:#d0a64f" onclick="uaVEps('+gi+')">分集/分P</button>';
       }
-      html+='<div class="mc-card">'+
+      html+='<div class="mc-card'+(i===0?' mc-feat':'')+'">'+
         _mcCover(ph, it.duration, it.platform)+
         '<div class="mc-body"><div class="mc-title">'+esc(it.title)+'</div>'+
         '<div class="mc-meta"><span>'+meta+'</span>'+(it.play?'<span class="pl">▶ '+esc(it.play)+'</span>':'')+'</div>'+
@@ -2945,6 +2964,40 @@ function uaDlStartWith(u){
 
 /* ===== 媒体中心 · 音乐 ===== */
 let mTmp=null, mItems=[];
+/* 酷狗风 · 歌单广场卡 */
+const _M_PL=[["经典老歌","#ff5f6d","#ffc371"],["华语流行","#3a7bd5","#00d2ff"],["民谣","#11998e","#38ef7d"],["轻音乐","#7c4dff","#00dbde"],["影视原声","#fc4a1a","#f7b733"],["钢琴曲","#654ea3","#eaafc8"]];
+function mRenderPl(){
+  const box=$("#m-pl"); if(!box)return;
+  if(box.children.length)return;
+  box.innerHTML=_M_PL.map((p,i)=>{
+    const h=(i*57)%360;
+    return '<div class="mc-card mc-pl-card" onclick="mSug(\''+p[0]+'\')" title="播放歌单：'+esc(p[0])+'">'+
+      '<div class="mc-cover" style="aspect-ratio:1/1;--c1:'+p[1]+';--c2:'+p[2]+'">'+
+        '<span class="mc-badge">歌单</span><div class="ph" style="font-size:34px">♪</div>'+
+        '<span class="mc-playic">▶</span></div>'+
+      '<div class="mc-body"><div class="mc-title">'+esc(p[0])+'</div>'+
+      '<div class="mc-meta"><span>点击即播 · 公开内容</span></div></div></div>';
+  }).join("");
+}
+/* 快看风 · 漫画站点卡 */
+const _M_SITES=[["动漫之家","https://manhua.dmzj.com/","#ff5f6d","#ffc371","漫"],["快看漫画","https://www.kuaikanmanhua.com/","#7c4dff","#00dbde","快"],["哔哩漫画","https://manga.bilibili.com/","#00a1d6","#66ccff","B"],["腾讯动漫","https://ac.qq.com/Comic/all","#ff9f43","#ff5f6d","腾"]];
+function mRenderSites(){
+  const box=$("#m-comic-sites"); if(!box)return;
+  if(box.children.length)return;
+  box.innerHTML=_M_SITES.map(st=>'<div class="mc-card mc-site-card">'+
+    '<div class="mc-cover" style="aspect-ratio:3/4;--c1:'+st[2]+';--c2:'+st[3]+'">'+
+      '<span class="mc-badge">漫画站</span><div class="ph" style="font-size:40px">'+st[4]+'</div>'+
+      '<span class="mc-playic" style="font-size:13px">进入</span></div>'+
+    '<div class="mc-body"><div class="mc-title">'+esc(st[0])+'</div>'+
+    '<div class="mc-acts"><button class="btn btn-sm btn-primary" style="flex:1" onclick="mOpenSite(\''+st[1]+'\')">进入浏览</button></div></div></div>').join("");
+}
+/* 频道导航 */
+function mNav(k){
+  const map={recommend:"mc-sec-rank",rank:"mc-sec-rank",playlist:"mc-sec-playlist"};
+  const el=document.getElementById(map[k]||"mc-sec-playlist");
+  if(el)el.scrollIntoView({behavior:"smooth",block:"center"});
+}
+function mBNav(t){$("#m-bq").value=t;mBSearch();}
 function mSug(t){$("#m-q").value=t;mSearch();}
 async function mSearch(){
   const q=$("#m-q").value.trim();
@@ -2970,6 +3023,7 @@ async function mSearch(){
 function mPlayEx(i){
   const it=(mItems||[])[i]; if(!it)return;
   const a=$("#m-audio"); a.pause(); a.src=""; a.onerror=null;
+  const now=$("#m-now"); if(now)now.textContent="♪ 正在播放："+it.title+" · "+it.author;
   if(mTmp){api("url/play_clean",{path:mTmp}).then(()=>{});mTmp=null;}
   toast("点开即播…（流式代理）");
   a.onerror=()=>{ a.onerror=null; a.src=""; toast("流式播放失败，改用完整下载模式…"); mPlay(i); };
@@ -3015,13 +3069,13 @@ async function mBSearch(){
   if(!r.ok){box.innerHTML='<div style="grid-column:1/-1;color:#e07b7b;font-size:12px">'+(r.error||"搜索失败")+'</div>';return;}
   const its=r.items||[];
   box.innerHTML='<div style="grid-column:1/-1;color:var(--text2);font-size:12px">找到 '+its.length+' 条公开内容（来源：'+(r.sources||[]).join("/")+'）</div>'+
-    its.map((it,i)=>'<div class="mc-card"><div class="mc-cover" style="--c1:#6f4e37;--c2:#4a3226">'+
+    its.map((it,i)=>'<div class="mc-card"><div class="mc-cover" style="aspect-ratio:3/4;--c1:#6f4e37;--c2:#4a3226">'+
       '<span class="mc-badge">'+esc(it.platform||"小说")+'</span>'+
-      '<div class="ph" style="font-size:34px">📖</div>'+
-      '<span class="mc-playic">▶</span></div>'+
+      '<div class="ph" style="font-size:40px">📖</div>'+
+      '<span class="mc-playic" style="font-size:13px">阅读</span></div>'+
       '<div class="mc-body"><div class="mc-title">'+esc(it.title)+'</div>'+
       '<div class="mc-meta"><span>'+esc(it.author||"-")+'</span></div>'+
-      '<div class="mc-acts"><button class="btn btn-sm" style="border-color:var(--accent);color:var(--accent);flex:1" onclick="mBookReadUrl('+i+')">📖 阅读</button></div></div></div>').join("");
+      '<div class="mc-acts"><button class="btn btn-sm btn-primary" style="flex:1" onclick="mBookReadUrl('+i+')">阅读</button></div></div></div>').join("");
   window._mBItems=its;
 }
 function mBookReadUrl(i){
