@@ -2848,6 +2848,11 @@ function uaPlayEx(u,title){
     if(!r.ok){ done(); uaPlayClose(); toast(r.error||"解析失败，已打开原网页"); openSrc(); return; }
     if(r.kind==="page"){ done(); uaPlayClose(); openSrc(); return; }
     if(r.kind==="hls"){ if(!playHls(r.url)){ done(); uaPlayClose(); openSrc(); } return; }
+    if(r.kind==="hls_proxy"){
+      const hp="api/url/hls?u="+encodeURIComponent(r.url)+(r.ref?("&ref="+encodeURIComponent(r.ref)):"");
+      if(!playHls(hp)){ done(); uaPlayClose(); openSrc(); }
+      return;
+    }
     // direct / dash：后端流式代理（单流直接代理 / 分离流 ffmpeg 合并）
     const q="url="+encodeURIComponent(r.url||u)+(r.aurl?("&a="+encodeURIComponent(r.aurl)):"");
     v.src="api/url/play?"+q;

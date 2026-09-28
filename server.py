@@ -2502,6 +2502,216 @@ def _web_extract_video(u):
     return None
 
 
+_EDGE_PATH = r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"
+try:
+    import http.client as _hc
+    _hc._MAXHEADERS = 1000
+except Exception:
+    pass
+
+
+def _browser_capture(u, timeout=14):
+    """第三层兜底：Edge headless + CDP 监听网络请求，抓取 JS 渲染站的真实媒体直链。
+    返回 {"url","kind","ref","title"} 或 None。仅当前两层（yt-dlp / 正则）都失败时调用。"""
+    import websocket
+    import subprocess, tempfile, shutil, urllib.parse, time, json, os
+    if not os.path.exists(_EDGE_PATH):
+        return None
+    _port = 9333
+    _tmp = tempfile.mkdtemp(prefix="dp_br_")
+    _proc = None
+    try:
+        _proc = subprocess.Popen([_EDGE_PATH, "--headless=new", "--disable-gpu", "--no-sandbox",
+                                  "--disable-dev-shm-usage", "--remote-debugging-port=%d" % _port,
+                                  "--remote-allow-origins=*", "--user-data-dir=%s" % _tmp, "about:blank"],
+                                 stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        _ready = False
+        for _ in range(40):
+            try:
+                urllib.request.urlopen("http://127.0.0.1:%d/json/version" % _port, timeout=2)
+                _ready = True
+                break
+            except Exception:
+                time.sleep(0.25)
+        if not _ready:
+            return None
+        _req = urllib.request.Request("http://127.0.0.1:%d/json/new?%s" % (_port, urllib.parse.quote(u, safe="")), method="PUT")
+        _tab = json.loads(urllib.request.urlopen(_req, timeout=6).read().decode("utf-8", "ignore"))
+        _ws = websocket.create_connection(_tab["webSocketDebuggerUrl"], timeout=timeout)
+        _seq = [0]
+        _hits = []
+        _refs = {}
+        _media = re.compile(r"\.(m3u8|m3u|mp4|webm|flv|mov)(\?|$)", re.I)
+        _bad = re.compile(r"(\.ts(\?|$)|\.jpg|\.jpeg|\.png|\.gif|\.webp|\.css|\.js(\?|$)|favicon|logo|banner|sprite|thumbnail|avatar|/ads?/|\.mp3(\?|$)|\.aac(\?|$)|\.ogg(\?|$)|/api/|\.json(\?|$))", re.I)
+        def _send(m, p_=None):
+            _seq[0] += 1
+            _ws.send(json.dumps({"id": _seq[0], "method": m, "params": p_ or {}}))
+        _send("Network.enable")
+        _send("Page.enable")
+        _send("Runtime.enable")
+        _send("Page.navigate", {"url": u})
+        _dead = time.time() + timeout
+        _last_tap = 0.0
+        _check_no_video = 0.0
+        _check_video_id = None
+        _no_video = False
+        _tap_js = ("(()=>{try{"
+                   "const vs=document.querySelectorAll('video');"
+                   "vs.forEach(v=>{try{if(!v.src&&!v.currentSrc){v.play();}}catch(e){}});"
+                   "const bt=Array.from(document.querySelectorAll('button,[class*=play i],[class*=Play],[id*=play],[class*=btn],[data-click*=play],[role=button]'))"
+                   ".filter(b=>/\u64ad\u653e|play|\u5f00\u59cb/i.test((b.textContent||'')+(b.className||'')+(b.getAttribute('aria-label')||'')));"
+                   "bt.slice(0,6).forEach(b=>{try{b.click();}catch(e){}});"
+                   "}catch(e){};return true})()")
+        _video_check_js = ("(()=>{"
+                           "const vs=document.querySelectorAll('video').length;"
+                           "const ifr=Array.from(document.querySelectorAll('iframe')).filter(f=>/play|video|player|embed/i.test(f.src||'')).length;"
+                           "return {v:vs,i:ifr}})()")
+        while time.time() < _dead:
+            try:
+                _ws.settimeout(max(0.2, _dead - time.time()))
+                _msg = json.loads(_ws.recv())
+            except Exception:
+                break
+            if _msg.get("method") == "Runtime.consoleAPICalled":
+                continue
+            if time.time() - _last_tap > 2.5:
+                _last_tap = time.time()
+                try:
+                    _send("Runtime.evaluate", {"expression": _tap_js, "returnByValue": True})
+                except Exception:
+                    pass
+            if time.time() - _check_no_video > 3.5 and not _no_video:
+                _check_no_video = time.time()
+                try:
+                    _check_video_id = _seq[0] + 1
+                    _send("Runtime.evaluate", {"expression": _video_check_js, "returnByValue": True})
+                except Exception:
+                    pass
+            if _check_video_id is not None and _msg.get("id") == _check_video_id:
+                _check_video_id = None
+                _res = _msg.get("result", {}).get("result", {}).get("value")
+                if isinstance(_res, dict) and _res.get("v") == 0 and not _res.get("i"):
+                    _no_video = True
+                    break
+            if _msg.get("method") == "Network.requestWillBeSent":
+                _rq = _msg.get("params", {}).get("request", {})
+                _url = _rq.get("url") or ""
+                if _media.search(_url) and not _bad.search(_url):
+                    _hits.append(_url)
+                    _hd = _rq.get("headers") or {}
+                    _refs[_url] = _hd.get("Referer") or _hd.get("Origin") or ""
+                    if len(_hits) >= 4:
+                        break
+        _ws.close()
+        if not _hits:
+            return None
+        _pick = None
+        for _h in _hits:
+            if ".m3u8" in _h.lower() or ".m3u" in _h.lower():
+                _pick = _h
+                break
+        if _pick is None:
+            _pick = _hits[0]
+        _ref = _refs.get(_pick) or ""
+        _low = _pick.lower()
+        _kind = "hls" if (".m3u8" in _low or ".m3u" in _low) else "direct"
+        return {"url": _pick, "kind": _kind, "ref": _ref, "title": u[:60]}
+    except Exception:
+        return None
+    finally:
+        try:
+            if _proc is not None:
+                _proc.kill()
+        except Exception:
+            pass
+        shutil.rmtree(_tmp, ignore_errors=True)
+
+
+def _http_get(url, ref="", timeout=15, rng=None):
+    _hd = {"User-Agent": _DL_UA_POOL[0] if isinstance(_DL_UA_POOL, list) and _DL_UA_POOL else "Mozilla/5.0",
+           "Accept": "*/*", "Accept-Language": "zh-CN,zh;q=0.9"}
+    if ref.startswith(("http://", "https://")):
+        _hd["Referer"] = ref
+    if rng:
+        _hd["Range"] = rng
+    return urllib.request.urlopen(urllib.request.Request(url, headers=_hd), timeout=timeout)
+
+
+def api_url_hls(self, params):
+    """GET /api/url/hls?u=<m3u8>&ref=<来源页> → 拉取原站清单并把分片/密钥 URL 重写为本服务代理。
+    前端 hls.js 加载该代理地址即可播放（绕过 CORS 与 Referer 限制，由后端代拉）。"""
+    u = str(params.get("u") or "").strip()
+    ref = str(params.get("ref") or "").strip()
+    if not u.startswith(("http://", "https://")):
+        self._send(400, b"bad url", "text/plain; charset=utf-8")
+        return
+    try:
+        _resp = _http_get(u, ref)
+        _body = _resp.read(4 * 1024 * 1024).decode("utf-8", "ignore")
+    except Exception as _e:
+        self._send(502, ("fetch m3u8 failed: %s" % str(_e)[:80]).encode("utf-8"), "text/plain; charset=utf-8")
+        return
+    _lines = _body.splitlines()
+    _out = []
+    for _ln in _lines:
+        _t = _ln.strip()
+        if not _t:
+            _out.append(_ln)
+            continue
+        if _t.startswith("#EXT-X-KEY"):
+            _m = re.search(r'URI="([^"]+)"', _ln)
+            if _m:
+                _ku = _m.group(1)
+                if not _ku.startswith(("http://", "https://")):
+                    _ku = urllib.parse.urljoin(u, _ku)
+                _ln = _ln.replace(_m.group(0), 'URI="/api/url/hlsseg?u=' + urllib.parse.quote(_ku, safe="") + '&ref=' + urllib.parse.quote(ref, safe="") + '"')
+            _out.append(_ln)
+            continue
+        if _t.startswith("#"):
+            _out.append(_ln)
+            continue
+        if _t.startswith("http"):
+            _su = _t
+        else:
+            _su = urllib.parse.urljoin(u, _t)
+        _out.append("/api/url/hlsseg?u=" + urllib.parse.quote(_su, safe="") + "&ref=" + urllib.parse.quote(ref, safe=""))
+    self._send(200, "\n".join(_out).encode("utf-8"), "application/vnd.apple.mpegurl; charset=utf-8")
+
+
+def api_url_hlsseg(self, params):
+    """GET /api/url/hlsseg?u=<分片|密钥>&ref=<来源页> → 后端代拉分片/密钥并透传。"""
+    u = str(params.get("u") or "").strip()
+    ref = str(params.get("ref") or "").strip()
+    rng = ""
+    try:
+        _hd_self = getattr(self, "headers", None)
+        if _hd_self is not None:
+            _r = self.headers.get("Range")
+            if _r:
+                rng = _r
+    except Exception:
+        pass
+    if not u.startswith(("http://", "https://")):
+        self._send(400, b"bad url", "text/plain; charset=utf-8")
+        return
+    try:
+        _resp = _http_get(u, ref, timeout=30, rng=rng)
+    except Exception as _e:
+        self._send(502, ("seg failed: %s" % str(_e)[:80]).encode("utf-8"), "text/plain; charset=utf-8")
+        return
+    _ct = _resp.headers.get("Content-Type") or "application/octet-stream"
+    self.send_response(200)
+    self.send_header("Content-Type", _ct)
+    self.send_header("Access-Control-Allow-Origin", "*")
+    self.send_header("Cache-Control", "public, max-age=3600")
+    self.end_headers()
+    while True:
+        _ch = _resp.read(65536)
+        if not _ch:
+            break
+        self.wfile.write(_ch)
+
+
 def api_url_play(self, params):
     """GET /api/url/play?url=<直链>&a=<音频流>&ref=<来源页>
     分离流用 ffmpeg 实时合并成 fMP4 流式转发；单流直接代理（支持 Range）。"""
@@ -2536,6 +2746,10 @@ def api_url_play(self, params):
                         _ci = None
                     if _ci is None:
                         _ci = _web_extract_video(u)
+                    if _ci is None:
+                        _bc = _browser_capture(u)
+                        if _bc and _bc.get("url"):
+                            _ci = {"url": _bc["url"], "kind": _bc.get("kind"), "ref": _bc.get("ref", ""), "title": _bc.get("title", "")}
                     if _ci is not None:
                         _play_cache_put(u, info=_ci)
                     else:
@@ -2691,15 +2905,25 @@ def api_url_resolve(self, params):
             _ci = _ci["info"]
         else:
             _ci = None
+        # 第三层兜底：yt-dlp 与正则都失败 → Edge headless 渲染页面抓真实媒体请求
+        if not (isinstance(_ci, dict) and _ci.get("url")):
+            _bc = _browser_capture(u)
+            if _bc and _bc.get("url"):
+                _ci = {"url": _bc["url"], "kind": _bc.get("kind"), "ref": _bc.get("ref", ""), "title": _bc.get("title", "")}
+                _play_cache_put(u, info=_ci)
     except Exception as e:
         return {"ok": False, "error": "解析失败：%s" % str(e)[:90]}
     if isinstance(_ci, dict) and _ci.get("url"):
         _url = _ci["url"]; _low = _url.lower()
+        _ref = _ci.get("ref") or ""
         if ".m3u8" in _low or ".m3u" in _low:
+            # 浏览器抓到的 m3u8 大概率需 Referer/CORS 代理 → hls_proxy；yt-dlp 出的受信源仍可直连
+            if _ci.get("kind") == "hls" and _ref:
+                return {"ok": True, "kind": "hls_proxy", "url": _url, "ref": _ref, "title": _ci.get("title", "")}
             return {"ok": True, "kind": "hls", "url": _url, "title": _ci.get("title", "")}
         if _ci.get("aurl"):
             return {"ok": True, "kind": "dash", "url": _url, "aurl": _ci["aurl"], "title": _ci.get("title", "")}
-        return {"ok": True, "kind": "direct", "url": _url, "title": _ci.get("title", "")}
+        return {"ok": True, "kind": "direct", "url": _url, "ref": _ref, "title": _ci.get("title", "")}
     return {"ok": True, "kind": "page", "url": u}
 
 
@@ -3957,6 +4181,12 @@ class Handler(BaseHTTPRequestHandler):
                 api_url_play(self, params)
             if parsed.path == "/api/url/resolve":
                 return self._send(200, json.dumps(api_url_resolve(self, params), ensure_ascii=False).encode("utf-8"))
+            if parsed.path == "/api/url/hls":
+                api_url_hls(self, params)
+                return
+            if parsed.path == "/api/url/hlsseg":
+                api_url_hlsseg(self, params)
+                return
             if parsed.path == "/api/url/analyze":
                 return self._send(200, json.dumps(api_url_analyze(params), ensure_ascii=False).encode("utf-8"))
             if parsed.path == "/api/url/check":
